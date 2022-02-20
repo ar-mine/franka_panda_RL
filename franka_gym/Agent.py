@@ -1,25 +1,18 @@
 import numpy as np
 
 import torch
-import torch.nn as nn
 import torch.optim as optim
 import torch.nn.functional as F
 from torch.distributions import Normal
 
-device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
+from TacNet import ActorNet, CriticNet, ReplayBuffer
 
 
 class Agent:
     """
     An implementation of Soft Actor-Critic (SAC), Automatic entropy adjustment SAC (ASAC)
     """
-
-    def __init__(self,
-                 env,
-                 args,
-                 state_dim,
-                 action_dim,
-                 action_limit,
+    def __init__(self, env, state_dim, action_dim, action_limit, device,
                  steps=0,
                  gamma=0.99,
                  alpha=0.2,
@@ -39,21 +32,22 @@ class Agent:
                  ):
         super(Agent, self).__init__()
 
-        if logger is None:
-            logger = dict()
-        if alpha_losses is None:
-            alpha_losses = list()
-        if qf2_losses is None:
-            qf2_losses = list()
-        if qf1_losses is None:
-            qf1_losses = list()
         if actor_losses is None:
             actor_losses = list()
+        if qf1_losses is None:
+            qf1_losses = list()
+        if qf2_losses is None:
+            qf2_losses = list()
+        if alpha_losses is None:
+            alpha_losses = list()
+        if logger is None:
+            logger = dict()
+
         self.env = env
-        self.args = args
         self.obs_dim = state_dim
         self.act_dim = action_dim
         self.act_limit = action_limit
+        self.device = device
         self.steps = steps
         self.gamma = gamma
         self.alpha = alpha
@@ -72,7 +66,7 @@ class Agent:
         self.logger = logger
 
         # Main network
-        self.actor = ActorNet(state_dim).to(device)
+        self.actor = ActorNet(state_dim, action_dim).to(device)
         self.qf1 = CriticNet(state_dim, action_dim).to(device)
         self.qf2 = CriticNet(state_dim, action_dim).to(device)
         # Target network
@@ -89,7 +83,7 @@ class Agent:
         self.qf2_optimizer = optim.Adam(self.qf2.parameters(), lr=self.qf_lr)
 
         # Experience buffer
-        self.replay_buffer = ReplayBuffer(self.obs_dim, self.act_dim, self.buffer_size)
+        self.replay_buffer = ReplayBuffer(self.obs_dim, self.act_dim, self.buffer_size, self.device)
 
         # If automatic entropy tuning is True,
         # initialize a target entropy, a log alpha and an alpha optimizer
@@ -120,13 +114,13 @@ class Agent:
         q2 = self.qf2(obs1, acts).squeeze(1)
 
         # Min Double-Q: min(Q1(s,π(s)), Q2(s,π(s))), min(Q1‾(s',π(s')), Q2‾(s',π(s')))
-        min_q_pi = torch.min(self.qf1(obs1, pi), self.qf2(obs1, pi)).squeeze(1).to(device)
-        min_q_next_pi = torch.min(self.qf1_target(obs2, next_pi), self.qf2_target(obs2, next_pi)).squeeze(1).to(device)
+        min_q_pi = torch.min(self.qf1(obs1, pi), self.qf2(obs1, pi)).squeeze(1).to(self.device)
+        min_q_next_pi = torch.min(self.qf1_target(obs2, next_pi), self.qf2_target(obs2, next_pi)).squeeze(1).to(self.device)
 
         # Targets for Q and V regression
         v_backup = min_q_next_pi - self.alpha * next_log_pi
         q_backup = rews + self.gamma * (1 - done) * v_backup
-        q_backup.to(device)
+        q_backup.to(self.device)
 
         # Check shape of prediction and target
         # print("action", action)
@@ -185,7 +179,7 @@ class Agent:
             target_param.data.copy_(tau * main_param.data + (1.0 - tau) * target_param.data)
 
     def tsallis_entropy_log_q(self, x, q):
-        safe_x = torch.max(x, torch.Tensor([1e-6]).to(device))
+        safe_x = torch.max(x, torch.Tensor([1e-6]).to(self.device))
 
         if q == 1:
             log_q_x = torch.log(safe_x)
@@ -194,8 +188,11 @@ class Agent:
         return log_q_x.sum(dim=-1)
 
     def select_action(self, state):
-        state = torch.FloatTensor(state).to(device)
-        mu, log_sigma = self.actor(state)
+        if isinstance(state, np.ndarray):
+            state_ = torch.FloatTensor(state).to(self.device)
+        else:
+            state_ = state
+        mu, log_sigma = self.actor(state_)
         sigma = torch.exp(log_sigma)
 
         dist = Normal(mu, sigma)
@@ -207,7 +204,7 @@ class Agent:
         exp_log_pi = torch.exp(log_pi)
         log_pi = self.tsallis_entropy_log_q(exp_log_pi, self.q)
 
-        action = action_limit*torch.tanh(z).detach().cpu().numpy()
+        action = self.act_limit*torch.tanh(z).detach().cpu().numpy()
         return action, pi_tensor, log_pi
 
     def train(self, mode: bool = True):
@@ -222,74 +219,4 @@ class Agent:
 
     def load_model(self, model_name):
         name = "./model/policy%d" % model_name
-        self.actor = torch.load("{}.pkl".format(name))
-
-
-class ActorNet(nn.Module):
-    def __init__(self, state_dim, min_log_std=-10, max_log_std=10):
-        super(ActorNet, self).__init__()
-        self.fc1 = nn.Linear(state_dim, args.hidden_sizes)
-        # self.fc2 = nn.Linear(args.hidden_sizes, args.hidden_sizes)
-        self.mu_head = nn.Linear(args.hidden_sizes, action_dim)
-        self.log_std_head = nn.Linear(args.hidden_sizes, action_dim)
-
-        self.min_log_std = min_log_std
-        self.max_log_std = max_log_std
-
-    def forward(self, x):
-        x = F.relu(self.fc1(x))
-        # x = F.relu(self.fc2(x))
-
-        mu = self.mu_head(x)
-        log_std_head = F.relu(self.log_std_head(x))
-        log_std_head = torch.clamp(log_std_head, self.min_log_std, self.max_log_std)
-
-        return mu, log_std_head
-
-
-class CriticNet(nn.Module):
-    def __init__(self, state_dim, action_dim):
-        super(CriticNet, self).__init__()
-        self.fc1 = nn.Linear(state_dim + action_dim, args.hidden_sizes)
-        # self.fc2 = nn.Linear(args.hidden_sizes, args.hidden_sizes)
-        self.fc3 = nn.Linear(args.hidden_sizes, 1)
-
-    def forward(self, s, a):
-        s = s.reshape(-1, state_dim)
-        a = a.reshape(-1, action_dim)
-        x = torch.cat((s, a), -1)  # combination s and a
-        x = F.relu(self.fc1(x))
-        # x = F.relu(self.fc2(x))
-        x = self.fc3(x)
-        return x
-
-
-class ReplayBuffer(object):
-    """
-    A simple FIFO experience replay buffer for agents.
-    """
-
-    def __init__(self, obs_dim, act_dim, size):
-        self.obs1_buf = np.zeros([size, obs_dim], dtype=np.float32)
-        self.obs2_buf = np.zeros([size, obs_dim], dtype=np.float32)
-        self.acts_buf = np.zeros([size, act_dim], dtype=np.float32)
-        self.rews_buf = np.zeros(size, dtype=np.float32)
-        self.done_buf = np.zeros(size, dtype=np.float32)
-        self.ptr, self.size, self.max_size = 0, 0, size
-
-    def add(self, obs, act, rew, next_obs, done):
-        self.obs1_buf[self.ptr] = obs
-        self.obs2_buf[self.ptr] = next_obs
-        self.acts_buf[self.ptr] = act
-        self.rews_buf[self.ptr] = rew
-        self.done_buf[self.ptr] = done
-        self.ptr = (self.ptr+1) % self.max_size
-        self.size = min(self.size+1, self.max_size)
-
-    def sample(self, batch_size=64):
-        idxs = np.random.randint(0, self.size, size=batch_size)
-        return dict(obs1=torch.Tensor(self.obs1_buf[idxs]).to(device),
-                    obs2=torch.Tensor(self.obs2_buf[idxs]).to(device),
-                    acts=torch.Tensor(self.acts_buf[idxs]).to(device),
-                    rews=torch.Tensor(self.rews_buf[idxs]).to(device),
-                    done=torch.Tensor(self.done_buf[idxs]).to(device))
+        self.actor = torch.load("{}.pkl".format(name), map_location=self.device)
