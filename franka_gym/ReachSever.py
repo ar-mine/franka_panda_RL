@@ -18,7 +18,7 @@ class ReachSever:
         self.max_step = 200
 
         # Set env
-        env_mode = 'PandaReachJointsDense-v2'
+        env_mode = 'PandaReachDense-v2'
         self.env = gym.make(env_mode, render=True)
         print("Env_Name------>", env_mode)
         # Env configuration

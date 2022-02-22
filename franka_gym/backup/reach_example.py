@@ -1,7 +1,7 @@
 import gym
 import panda_gym
 
-env = gym.make('PandaReachDense-v2', render=True)
+env = gym.make('PandaReachJointsDense-v2', render=True)
 
 obs = env.reset()
 done = False
