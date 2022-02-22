@@ -119,5 +119,40 @@ class ReachSever:
         plt.ylabel('AverageReturns')
         plt.show()
 
-    def motion_generate(self, q_current, state_goal):
-        pass
+    def motion_generate(self, max_iter):
+        self.agent.load_model(self.test_model)
+        print("#The model:", self.test_model, 'is loaded!!!')
+
+        train_num_steps = 0
+        train_sum_returns = 0.
+        train_num_episodes = 0
+
+        for i in range(max_iter):
+            # Run one episode
+            step_number = 0
+            total_reward = 0.
+            waypoints = []
+
+            obs = self.agent.env.reset()
+            done = False
+
+            # Keep interacting until agent reaches a terminal state.
+            while not (done or step_number == self.max_step):
+                self.agent.steps += 1
+
+                relative_dis = obs['desired_goal'] - obs['observation'][0:3]
+                mu, _ = self.agent.actor(torch.FloatTensor(relative_dis).to(self.device))
+                action = self.action_limit * torch.tanh(mu).detach().cpu().numpy()
+                next_obs, reward, done, _ = self.agent.env.step(action)
+
+                waypoints.append(obs['observation'])
+
+                total_reward += reward
+                step_number += 1
+                obs = next_obs
+
+            yield np.array(waypoints)
+
+            train_num_steps += step_number
+            train_sum_returns += total_reward
+            train_num_episodes += 1
