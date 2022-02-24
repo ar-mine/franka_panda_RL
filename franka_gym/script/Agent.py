@@ -218,5 +218,5 @@ class Agent:
         torch.save(self.actor, "{}.pkl".format(name))
 
     def load_model(self, model_name):
-        name = "./model/policy%d" % model_name
+        name = "script/model/policy%d" % model_name
         self.actor = torch.load("{}.pkl".format(name), map_location=self.device)

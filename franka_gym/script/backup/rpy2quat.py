@@ -22,4 +22,4 @@ def get_quaternion_from_euler(roll, pitch, yaw):
 
 
 if __name__ == "__main__":
-    print(get_quaternion_from_euler(0, 0, 0))
+    print(get_quaternion_from_euler(np.pi, 0, 0))

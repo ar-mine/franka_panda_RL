@@ -1,0 +1,5 @@
+float64[] current_states
+---
+float64[] waypoints
+---
+float64[] partial_waypoints
