@@ -1,3 +1,5 @@
+import numpy as np
+
 import rclpy
 from rclpy.action import ActionServer
 from rclpy.node import Node
@@ -18,10 +20,16 @@ class ReachActionServer(Node):
             self.execute_callback)
         self.sever = ReachSever()
         self.motion_sever = self.sever.motion_generate(5)
+        next(self.motion_sever)
+
+        self.get_logger().info("The sever has been initialized!")
 
     def execute_callback(self, goal_handle):
         self.get_logger().info('Executing goal...')
         goal_handle.succeed()
+
+        # print(np.array(goal_handle.request.current_states))
+        self.sever.set_goal(np.array(goal_handle.request.current_states))
 
         waypoints = next(self.motion_sever)
         waypoints = waypoints.flatten().tolist()

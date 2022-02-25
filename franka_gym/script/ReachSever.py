@@ -1,6 +1,8 @@
 import torch
 import gym
 import panda_gym
+from env.PandaReachDense_v3 import ReachTaskEnvV3
+
 import numpy as np
 import time
 import matplotlib.pyplot as plt
@@ -15,12 +17,10 @@ class ReachSever:
         self.test_model = 1000
         self.training_eps = 1000
         self.evaluation_eps = 10
-        self.max_step = 200
+        self.max_step = 50
 
         # Set env
-        env_mode = 'PandaReachDense-v2'
-        self.env = gym.make(env_mode, render=True)
-        print("Env_Name------>", env_mode)
+        self.env = ReachTaskEnvV3(render=True)
         # Env configuration
         self.state_dim = int(self.env.observation_space['observation'].shape[0] / 2)
         self.action_dim = self.env.action_space.shape[0]
@@ -37,6 +37,7 @@ class ReachSever:
         # Create an agent
         self.agent = Agent(self.env, self.state_dim, self.action_dim, self.action_limit, device=self.device,
                            automatic_entropy_tuning=True)
+        self.goal = None
 
     def run(self, mode):
         start_time = time.time()
@@ -119,6 +120,9 @@ class ReachSever:
         plt.ylabel('AverageReturns')
         plt.show()
 
+    def set_goal(self, goal):
+        self.goal = goal
+
     def motion_generate(self, max_iter):
         self.agent.load_model(self.test_model)
         print("#The model:", self.test_model, 'is loaded!!!')
@@ -133,17 +137,21 @@ class ReachSever:
             total_reward = 0.
             waypoints = []
 
+            self.agent.env.set_goal(self.goal)
             obs = self.agent.env.reset()
             done = False
+            info = {'is_success': np.array(0)}
 
             # Keep interacting until agent reaches a terminal state.
-            while not (done or step_number == self.max_step):
+            while not (done or step_number == self.max_step or info['is_success']):
+                time.sleep(0.2)
                 self.agent.steps += 1
 
                 relative_dis = obs['desired_goal'] - obs['observation'][0:3]
+                # print(np.linalg.norm(relative_dis, axis=-1))
                 mu, _ = self.agent.actor(torch.FloatTensor(relative_dis).to(self.device))
                 action = self.action_limit * torch.tanh(mu).detach().cpu().numpy()
-                next_obs, reward, done, _ = self.agent.env.step(action)
+                next_obs, reward, done, info = self.agent.env.step(action)
 
                 waypoints.append(obs['observation'])
 

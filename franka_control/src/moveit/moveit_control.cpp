@@ -9,7 +9,7 @@
 static const rclcpp::Logger LOGGER = rclcpp::get_logger("franka_moveit_logger");
 
 
-void home_move(moveit::planning_interface::MoveGroupInterface move_group)
+void home_move(moveit::planning_interface::MoveGroupInterface& move_group)
 {
     geometry_msgs::msg::PoseStamped_<std::allocator<void>> current_pose_stamp = move_group.getCurrentPose();
     geometry_msgs::msg::Pose_<std::allocator<void>> current_pose = current_pose_stamp.pose;
@@ -72,7 +72,10 @@ int main(int argc, char **argv) {
     RCLCPP_INFO(LOGGER, "End effector link: %s", move_group.getEndEffectorLink().c_str());
 
     reach_action_client.send_goal();
-    rclcpp::sleep_for(std::chrono::seconds(5));
+    while(!reach_action_client.finish_flag)
+    {
+        rclcpp::sleep_for(std::chrono::milliseconds (100));
+    }
 
     std::vector<double> output = reach_action_client.output;
     auto point_sum = output.size() / 6;

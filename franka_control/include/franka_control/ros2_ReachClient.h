@@ -28,6 +28,7 @@ namespace franka_control
         explicit ReachActionClient(const std::shared_ptr<rclcpp::Node> &node_);
 
         std::vector<double> output;
+        bool finish_flag = false;
 
         void send_goal();
     private:

@@ -15,6 +15,7 @@ namespace franka_control
     void ReachActionClient::send_goal()
     {
         using namespace std::placeholders;
+        finish_flag = false;
 
         if (!this->reach_action_client->wait_for_action_server(std::chrono::seconds(10))) {
             RCLCPP_ERROR(this->node_->get_logger(), "Action server not available after waiting");
@@ -23,7 +24,7 @@ namespace franka_control
         }
 
         auto goal_msg = Reach::Goal();
-        goal_msg.current_states = {0.1, 0.1, 0.1};
+        goal_msg.current_states = {-0.1, -0.1, 0.1};
 
         RCLCPP_INFO(this->node_->get_logger(), "Sending goal");
 
@@ -63,6 +64,7 @@ namespace franka_control
     {
         switch (result.code) {
             case rclcpp_action::ResultCode::SUCCEEDED:
+                finish_flag = true;
                 break;
             case rclcpp_action::ResultCode::ABORTED:
                 RCLCPP_ERROR(this->node_->get_logger(), "Goal was aborted");
