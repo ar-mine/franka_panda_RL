@@ -27,6 +27,8 @@ set(MOVEIT_DEPEND
         rviz_visual_tools
         )
 add_executable(moveit_control moveit_control.cpp)
+add_executable(moveit_circle moveit_circle.cpp)
+
 ament_target_dependencies(moveit_control
         ${THIS_PACKAGE_INCLUDE_DEPENDS}
         ${MOVEIT_DEPEND}
@@ -34,8 +36,18 @@ ament_target_dependencies(moveit_control
         )
 target_link_libraries(moveit_control
         franka_client_lib franka_utils_lib)
-
 install(TARGETS
         moveit_control
+        DESTINATION lib/${PROJECT_NAME}
+        )
+
+ament_target_dependencies(moveit_circle
+        ${THIS_PACKAGE_INCLUDE_DEPENDS}
+        ${MOVEIT_DEPEND}
+        )
+target_link_libraries(moveit_circle
+        franka_client_lib franka_utils_lib)
+install(TARGETS
+        moveit_circle
         DESTINATION lib/${PROJECT_NAME}
         )

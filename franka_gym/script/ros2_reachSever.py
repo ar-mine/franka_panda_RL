@@ -28,8 +28,8 @@ class ReachActionServer(Node):
         self.get_logger().info('Executing goal...')
         goal_handle.succeed()
 
-        # print(np.array(goal_handle.request.current_states))
-        self.sever.set_goal(np.array(goal_handle.request.current_states))
+        # print(np.array(goal_handle.request.target_pose))
+        self.sever.set_goal(np.array(goal_handle.request.target_pose))
 
         waypoints = next(self.motion_sever)
         waypoints = waypoints.flatten().tolist()

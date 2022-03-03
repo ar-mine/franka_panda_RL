@@ -1,7 +1,7 @@
 //
 // Created by armine on 2/21/22.
 //
-#include "franka_control/moveit_control.hpp"
+#include "franka_control/moveit_circle.h"
 
 // All source files that use ROS logging should define a file-specific
 // static const rclcpp::Logger named LOGGER, located at the top of the file
@@ -11,18 +11,57 @@ static const rclcpp::Logger LOGGER = rclcpp::get_logger("franka_moveit_logger");
 
 void home_move(moveit::planning_interface::MoveGroupInterface& move_group)
 {
-    geometry_msgs::msg::PoseStamped_<std::allocator<void>> current_pose_stamp = move_group.getCurrentPose();
-    geometry_msgs::msg::Pose_<std::allocator<void>> current_pose = current_pose_stamp.pose;
-    posePrint(current_pose);
+    std::vector<double> home_joint_positions = {0, -45, 0, -135, 0, 90, 45};
+    deg2rad(home_joint_positions);
 
-    // Planning to a Pose goal
-    // We can plan a motion for this group to a desired pose for the end-effector.
+    move_group.setJointValueTarget(home_joint_positions);
+
+    moveit::planning_interface::MoveGroupInterface::Plan plan;
+    bool success = (move_group.plan(plan) == moveit::planning_interface::MoveItErrorCode::SUCCESS);
+    RCLCPP_INFO(LOGGER, "Move to home pose %s", success ? "" : "FAILED");
+
+    if (success)
+        move_group.move();
+}
+
+void draw_circle(moveit::planning_interface::MoveGroupInterface& move_group,
+                 moveit_visual_tools::MoveItVisualTools &visual_tools,
+                 const moveit::core::JointModelGroup* joint_model_group)
+{
+    int factor = 2;
+    std::vector<geometry_msgs::msg::Pose> waypoints;
+    geometry_msgs::msg::Pose target_pose;
+    for (int i = 0; i <= 180; i+=factor)
+    {
+        target_pose.position.x = sin(i*PI/180)*0.3;
+        target_pose.position.y = cos(i*PI/180)*0.3;
+        target_pose.position.z = 0.35;
+        target_pose.orientation.x = 1.0;
+        target_pose.orientation.y = 0.0;
+        target_pose.orientation.z = 0.0;
+        target_pose.orientation.w = 0.0;
+
+        waypoints.push_back(target_pose);
+    }
+
+    moveit_msgs::msg::RobotTrajectory trajectory;
+    const double jump_threshold = 0.0;
+    const double eef_step = 0.01;
+    double fraction = move_group.computeCartesianPath(waypoints, eef_step, jump_threshold, trajectory);
+    RCLCPP_INFO(LOGGER, "Circle path (%.2f%% acheived)", fraction * 100.0);
+
+    visual_tools.publishTrajectoryLine(trajectory, joint_model_group);
+    visual_tools.trigger();
+
+    move_group.execute(trajectory);
+}
+
+void pose_move(moveit::planning_interface::MoveGroupInterface& move_group)
+{
     geometry_msgs::msg::Pose home_pose;
-    home_pose.position = current_pose.position;
-    home_pose.position.x = 0.03844 + 0.6;
-    home_pose.position.y = 0.0;
-    home_pose.position.z = 0.19740;
-//    home_pose.orientation = current_pose.orientation;
+    home_pose.position.x = 0;
+    home_pose.position.y = 0.3;
+    home_pose.position.z = 0.35;
     home_pose.orientation.x = 1.0;
     home_pose.orientation.y = 0;
     home_pose.orientation.z = 0;
@@ -30,16 +69,10 @@ void home_move(moveit::planning_interface::MoveGroupInterface& move_group)
 
     move_group.setApproximateJointValueTarget(home_pose, "panda_hand_tcp");
 
-    // Now, we call the planner to compute the plan and visualize it.
-    // Note that we are just planning, not asking move_group
-    // to actually move the robot.
     moveit::planning_interface::MoveGroupInterface::Plan my_plan;
-
     const moveit::planning_interface::MoveItErrorCode ret = move_group.plan(my_plan);
-    std::cout << "Planning return is:" << ret.val << std::endl;
     bool success = (ret == moveit::planning_interface::MoveItErrorCode::SUCCESS);
-
-    RCLCPP_INFO(LOGGER, "Visualizing plan 1 (pose goal) %s", success ? "" : "FAILED");
+    RCLCPP_INFO(LOGGER, "Move to initial pose %s", success ? "" : "FAILED");
     if (success)
         move_group.move();
 }
@@ -49,10 +82,7 @@ int main(int argc, char **argv) {
     rclcpp::init(argc, argv);
     rclcpp::NodeOptions node_options;
     node_options.automatically_declare_parameters_from_overrides(true);
-    auto move_group_node = rclcpp::Node::make_shared("franka_moveit_control", node_options);
-
-    // Action init
-    auto reach_action_client = franka_control::ReachActionClient(move_group_node);
+    auto move_group_node = rclcpp::Node::make_shared("franka_moveit_circle", node_options);
 
     //
     rclcpp::executors::MultiThreadedExecutor executor;
@@ -72,6 +102,7 @@ int main(int argc, char **argv) {
     RCLCPP_INFO(LOGGER, "Planning frame: %s", move_group.getPlanningFrame().c_str());
     RCLCPP_INFO(LOGGER, "End effector link: %s", move_group.getEndEffectorLink().c_str());
 
+
     namespace rvt = rviz_visual_tools;
     moveit_visual_tools::MoveItVisualTools visual_tools(move_group_node, "panda_link0",
                                                         "rviz_visual_tools", move_group.getRobotModel());
@@ -84,44 +115,18 @@ int main(int argc, char **argv) {
     visual_tools.trigger();
     RCLCPP_INFO(LOGGER, "Initial finished!");
 
-    reach_action_client.send_goal();
-    while(!reach_action_client.finish_flag)
-    {
-        rclcpp::sleep_for(std::chrono::milliseconds (100));
-    }
 
-    std::vector<double> output = reach_action_client.output;
-    auto point_sum = output.size() / 6;
-    RCLCPP_INFO(LOGGER, "There are total %d points.", point_sum);
+    home_move(move_group);
 
-    std::vector<geometry_msgs::msg::Pose> waypoints;
-    geometry_msgs::msg::Pose target_pose;
-    for(unsigned long i=0; i<point_sum; i++)
-    {
-        target_pose.position.x = 0.6+output[i*6];
-        target_pose.position.y = output[i*6+1];
-        target_pose.position.z = output[i*6+2];
-        target_pose.orientation.x = 1.0;
-        target_pose.orientation.y = 0.0;
-        target_pose.orientation.z = 0.0;
-        target_pose.orientation.w = 0.0;
+    rclcpp::sleep_for(std::chrono::seconds (2));
 
-//        posePrint(target_pose);
+    pose_move(move_group);
 
-        waypoints.push_back(target_pose);
-    }
+    rclcpp::sleep_for(std::chrono::seconds (2));
 
-    moveit_msgs::msg::RobotTrajectory trajectory;
-    const double jump_threshold = 0.0;
-    const double eef_step = 0.01;
-    double fraction = move_group.computeCartesianPath(waypoints, eef_step, jump_threshold, trajectory);
-    RCLCPP_INFO(LOGGER, "Visualizing plan 4 (Cartesian path) (%.2f%% acheived)", fraction * 100.0);
+    draw_circle(move_group, visual_tools, joint_model_group);
 
-    visual_tools.publishTrajectoryLine(trajectory, joint_model_group);
     visual_tools.trigger();
-
-    move_group.execute(trajectory);
-
     rclcpp::shutdown();
     return 0;
 }

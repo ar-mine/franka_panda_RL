@@ -14,3 +14,12 @@ void posePrint(geometry_msgs::msg::Pose_<std::allocator<void>>& pose)
              <<"orientation.z:"<<pose.orientation.z<<"  "
              <<"orientation.w:"<<pose.orientation.w<<std::endl;
 }
+
+void deg2rad(std::vector<double> &deg)
+{
+    for (double & i : deg)
+    {
+        i *= (PI/180);
+    }
+
+}

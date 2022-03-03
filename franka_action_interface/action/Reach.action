@@ -1,4 +1,5 @@
-float64[] current_states
+float64[] current_joints
+float64[] target_pose
 ---
 float64[] waypoints
 ---
