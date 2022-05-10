@@ -32,9 +32,15 @@ namespace franka_vision
     class ArucoDetector : public rclcpp::Node
     {
     public:
-        ArucoDetector(const std::string &node_name, const std::string &img_tpc_in, const std::string &img_tpc_out);
+        explicit ArucoDetector(const rclcpp::NodeOptions &options);
 
-
+        /* The variables exposed to show the results of detector(Also be published to ROS sever).
+         *
+         * */
+        unsigned long total_num = 0;
+        std::vector<int> idx_list;
+        std::vector<std::vector<cv::Point2f>> corner_list;
+        cv::Mat img_in, img_out;
 
     private:
         void image_callback(const sensor_msgs::msg::Image::SharedPtr msg);

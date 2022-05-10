@@ -1,0 +1,146 @@
+//
+// Created by armine on 2/21/22.
+//
+#include "franka_control/moveit_control.hpp"
+# include "string"
+// All source files that use ROS logging should define a file-specific
+// static const rclcpp::Logger named LOGGER, located at the top of the file
+// and inside the namespace with the narrowest scope (if there is one)
+static const rclcpp::Logger LOGGER = rclcpp::get_logger("franka_moveit_logger");
+
+const std::vector<std::vector<double>> first_path = {
+        {-0.9884458446427165, -0.7477950658798218, -0.3030881033756238, -2.2141808765603916,  -0.19862245842008783, 1.4927035688295043, 1.1532491747381393},
+        {-1.2635669465553458, 0.3190801644962573, -0.257058037346128, -2.6655650785532625, -0.09452089605027506, 3.004647883468204, 0.8996444771346874},
+        {-1.3423639172754789, 0.02044283170581418, -0.16794687248361903, -2.72077312322264, -0.13181238807572257, 2.7905275542944343, 1.0383910030801116},
+        {-1.3051404196023169, 0.2624815425258909, -0.12531233322411314, -2.0957374171812724, -0.13109775282276998, 2.4400507531640696, 0.6416005666157637},
+        {-1.3169314930057534, -0.03594696223369816, -0.12803747597857712, -2.458680005150897, -0.13134587278630724, 2.437838254663679, 0.731690935031409},
+        {-1.4449123524681122, 0.1805308127235948, -0.1284453710174348, -2.2159348352291866, -0.13004579021937263, 2.4736006473435297, 0.9319326260371312},
+        {-1.4482177850704094, -0.09556369095718587, -0.1293763777899158, -2.474149961323964, -0.13079370158248477, 2.466360759206691, 1.2251638893801928},
+        {-1.6171391393108951, 0.4609759657884898, -0.22306637859342826, -1.7699645809064386, -0.1317227280341058, 2.463295823883909, 0.6931732776056342},
+        {-1.5553998230897443, 1.2015671899695144, -0.08808187501455421, -0.6657321989829246, 0.06715431911415534, 2.040840059015486, 0.7606939616919219},
+        {-1.5513038697676516, 1.2645342973073377, -0.11527933351358009, -0.8222315713062123, 0.10588995005416685, 2.221776668917436, 0.7201636484961781},
+        {-1.5553998230897443, 1.2015671899695144, -0.08808187501455421, -0.6657321989829246, 0.06715431911415534, 2.040840059015486, 0.7606939616919219},
+
+};
+
+const std::vector<std::vector<double>> second_path = {
+        {-0.9884458446427165, -0.7477950658798218, -0.3030881033756238, -2.2141808765603916,  -0.19862245842008783, 1.4927035688295043, 1.1532491747381393},
+        {-1.2635669465553458, 0.3190801644962573, -0.257058037346128, -2.6655650785532625, -0.09452089605027506, 3.004647883468204, 0.8996444771346874},
+        {-1.3423639172754789, 0.02044283170581418, -0.16794687248361903, -2.72077312322264, -0.13181238807572257, 2.7905275542944343, 1.0383910030801116},
+        {-1.6171391393108951, 0.4609759657884898, -0.22306637859342826, -1.7699645809064386, -0.1317227280341058, 2.463295823883909, 0.6931732776056342},
+        {-1.5553998230897443, 1.2015671899695144, -0.08808187501455421, -0.6657321989829246, 0.06715431911415534, 2.040840059015486, 0.7606939616919219},
+        {-1.5513038697676516, 1.2645342973073377, -0.11527933351358009, -0.8222315713062123, 0.10588995005416685, 2.221776668917436, 0.7201636484961781},
+        {-1.5553998230897443, 1.2015671899695144, -0.08808187501455421, -0.6657321989829246, 0.06715431911415534, 2.040840059015486, 0.7606939616919219},
+
+};
+
+void home_move(moveit::planning_interface::MoveGroupInterface& move_group)
+{
+    std::vector<double> home_joint_positions = {0, -45, 0, -135, 0, 90, 45};
+    deg2rad(home_joint_positions);
+
+    move_group.setJointValueTarget(home_joint_positions);
+
+    moveit::planning_interface::MoveGroupInterface::Plan plan;
+    bool success = (move_group.plan(plan) == moveit::planning_interface::MoveItErrorCode::SUCCESS);
+    RCLCPP_INFO(LOGGER, "Move to home pose %s", success ? "" : "FAILED");
+
+    if (success)
+        move_group.move();
+}
+
+int main(int argc, char **argv) {
+    // Node init
+    rclcpp::init(argc, argv);
+    rclcpp::NodeOptions node_options;
+    node_options.automatically_declare_parameters_from_overrides(true);
+    auto move_group_node = rclcpp::Node::make_shared("franka_moveit_control", node_options);
+
+    // Action init
+    auto reach_action_client = franka_control::ReachActionClient(move_group_node);
+
+    //
+    rclcpp::executors::MultiThreadedExecutor executor;
+    executor.add_node(move_group_node);
+    std::thread([&executor]() { executor.spin(); }).detach();
+
+    // MoveIt operates on sets of joints called "planning groups" and stores them in an object called
+    // the *JointModelGroup*. Throughout MoveIt, the terms "planning group" and "joint model group"
+    // are used interchangably.
+    static const std::string PLANNING_GROUP = "panda_manipulator";
+    moveit::planning_interface::MoveGroupInterface move_group(move_group_node, PLANNING_GROUP);
+    static const std::string HAND_GROUP = "hand";
+    moveit::planning_interface::MoveGroupInterface hand_group(move_group_node, HAND_GROUP);
+    move_group.setPlannerId("RRTConnectkConfigDefault");
+
+    // Getting Basic Information
+    RCLCPP_INFO(LOGGER, "Planning frame: %s", move_group.getPlanningFrame().c_str());
+    RCLCPP_INFO(LOGGER, "End effector link: %s", move_group.getEndEffectorLink().c_str());
+
+    namespace rvt = rviz_visual_tools;
+    moveit_visual_tools::MoveItVisualTools visual_tools(move_group_node, "panda_link0",
+                                                        "rviz_visual_tools", move_group.getRobotModel());
+
+    visual_tools.deleteAllMarkers();
+
+    /* Remote control is an introspection tool that allows users to step through a high level script */
+    /* via buttons and keyboard shortcuts in RViz */
+    visual_tools.loadRemoteControl();
+    visual_tools.trigger();
+    RCLCPP_INFO(LOGGER, "Initial finished!");
+
+    int i = 0;
+    for(const auto& point : first_path)
+    {
+        i ++;
+        move_group.setJointValueTarget(point);
+
+        move_group.move();
+
+        rclcpp::sleep_for(std::chrono::seconds(1));
+        if(i == 2)
+        {   std::vector<double> close = {0.005, 0.005};
+            hand_group.setJointValueTarget(close);
+            RCLCPP_INFO(LOGGER, "Hand close!");
+            hand_group.move();
+        }
+        if(i == 10)
+        {   std::vector<double> open = {0.035, 0.035};
+            hand_group.setJointValueTarget(open);
+            RCLCPP_INFO(LOGGER, "Hand open!");
+            hand_group.move();
+        }
+    }
+
+    rclcpp::sleep_for(std::chrono::seconds(4));
+
+    home_move(move_group);
+
+    rclcpp::sleep_for(std::chrono::seconds(3));
+
+    i = 0;
+    for(const auto& point : second_path)
+    {
+        i ++;
+        move_group.setJointValueTarget(point);
+
+        move_group.move();
+
+        rclcpp::sleep_for(std::chrono::milliseconds(200));
+        if(i == 2)
+        {   std::vector<double> close = {0.005, 0.005};
+            hand_group.setJointValueTarget(close);
+            RCLCPP_INFO(LOGGER, "Hand close!");
+            hand_group.move();
+        }
+        if(i == 6)
+        {   std::vector<double> open = {0.035, 0.035};
+            hand_group.setJointValueTarget(open);
+            RCLCPP_INFO(LOGGER, "Hand open!");
+            hand_group.move();
+        }
+    }
+
+    rclcpp::shutdown();
+    return 0;
+}

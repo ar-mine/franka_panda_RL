@@ -26,8 +26,9 @@ set(ARUCO_DEPEND
     )
 
 
-add_executable(aruco_detector_node aruco_detector_node.cpp)
-add_library(franka_aruco_lib SHARED
+#add_executable(aruco_detector_node aruco_detector_node.cpp)
+#add_executable(boxes_detector_node boxes_detector_node.cpp)
+add_library(aruco_detector_component SHARED
         aruco_detector.cpp
         )
 
@@ -35,20 +36,28 @@ include_directories(
         ${THIS_PACKAGE_INCLUDE_DIRS}
         ${OpenCV_INCLUDE_DIRS})
 
-ament_target_dependencies(franka_aruco_lib
+ament_target_dependencies(aruco_detector_component
         ${THIS_PACKAGE_INCLUDE_DEPENDS}
         ${ARUCO_DEPEND}
         )
-ament_target_dependencies(aruco_detector_node
-        ${THIS_PACKAGE_INCLUDE_DEPENDS}
-        ${ARUCO_DEPEND}
-        )
+#ament_target_dependencies(aruco_detector_node
+#        ${THIS_PACKAGE_INCLUDE_DEPENDS}
+#        ${ARUCO_DEPEND}
+#        )
+#ament_target_dependencies(boxes_detector_node
+#        ${THIS_PACKAGE_INCLUDE_DEPENDS}
+#        ${ARUCO_DEPEND}
+#        )
 
-target_link_libraries(aruco_detector_node
-        franka_aruco_lib)
+rclcpp_components_register_nodes(aruco_detector_component "franka_vision::ArucoDetector")
+
+#target_link_libraries(aruco_detector_node
+#        aruco_detector_component)
+#target_link_libraries(boxes_detector_node
+#        aruco_detector_component)
 
 install(TARGETS
-        franka_aruco_lib aruco_detector_node
+        aruco_detector_component
         ARCHIVE DESTINATION lib
         LIBRARY DESTINATION lib
         RUNTIME DESTINATION lib/${PROJECT_NAME})

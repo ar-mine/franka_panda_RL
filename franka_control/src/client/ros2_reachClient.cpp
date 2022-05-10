@@ -25,7 +25,8 @@ namespace franka_control
 
         auto goal_msg = Reach::Goal();
         goal_msg.current_joints = {0, 0, 0, 0, 0, 0, 0};
-        goal_msg.target_pose = {-0.1, -0.1, 0.1};
+//        goal_msg.target_pose = {-0.1, -0.1, 0.1};
+        goal_msg.target_pose = {-0.5, -0.46, 0.0687};
 
         RCLCPP_INFO(this->node_->get_logger(), "Sending goal");
 
