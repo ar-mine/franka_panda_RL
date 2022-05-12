@@ -13,4 +13,4 @@
 #include <moveit/planning_scene_interface/planning_scene_interface.h>
 #include <moveit_visual_tools/moveit_visual_tools.h>
 
-#include "geometry_utils.h"
+#include "franka_control/utils/geometry_utils.h"

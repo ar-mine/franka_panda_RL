@@ -12,7 +12,7 @@ static const rclcpp::Logger LOGGER = rclcpp::get_logger("franka_moveit_logger");
 void home_move(moveit::planning_interface::MoveGroupInterface& move_group)
 {
     std::vector<double> home_joint_positions = {0, -45, 0, -135, 0, 90, 45};
-    deg2rad(home_joint_positions);
+//    deg2rad(home_joint_positions);
 
     move_group.setJointValueTarget(home_joint_positions);
 

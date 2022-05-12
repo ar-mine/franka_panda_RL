@@ -7,7 +7,7 @@
 
 #endif //BUILD_MOVEIT_CONTROL_H
 
-#include "geometry_utils.h"
+#include "franka_control/utils/geometry_utils.h"
 
 #include "franka_control/ros2_ReachClient.h"
 
