@@ -36,9 +36,27 @@ set(MOVEIT_DEPEND
         geometry_msgs
         )
 
+set(CV_DEPEND
+        OpenCV
+        cv_bridge
+        )
+
+# utils library
+add_library(moveit_utils_lib SHARED
+        utils/moveit_utils.cpp
+        )
+ament_target_dependencies(moveit_utils_lib
+        ${THIS_PACKAGE_INCLUDE_DEPENDS}
+        ${MOVEIT_DEPEND}
+        )
+install(TARGETS
+        moveit_utils_lib
+        ARCHIVE DESTINATION lib
+        LIBRARY DESTINATION lib)
 
 add_executable(moveit_control moveit_control.cpp)
 add_executable(moveit_circle moveit_circle.cpp)
+add_executable(round_views round_views.cpp)
 
 target_include_directories(
         moveit_control
@@ -72,3 +90,17 @@ install(TARGETS
         moveit_circle
         DESTINATION lib/${PROJECT_NAME}
         )
+
+# round_views
+ament_target_dependencies(round_views
+        ${THIS_PACKAGE_INCLUDE_DEPENDS}
+        ${MOVEIT_DEPEND}
+        ${CV_DEPEND}
+        )
+target_link_libraries(round_views
+        moveit_utils_lib franka_utils_lib)
+install(TARGETS
+        round_views
+        DESTINATION lib/${PROJECT_NAME}
+        )
+
