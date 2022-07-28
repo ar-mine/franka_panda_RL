@@ -1,0 +1,8 @@
+/camera/camera:
+  ros__parameters:
+    rgb_camera:
+      profile: "640,480,30"
+    align_depth:
+      enable: true
+
+#node_name:

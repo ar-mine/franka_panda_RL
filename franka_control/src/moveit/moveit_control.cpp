@@ -23,7 +23,7 @@
 #include <tf2_ros/buffer.h>
 
 #include "franka_control/moveit_control.hpp"
-
+#include "franka_control/utils/moveit_utils.h"
 #include "franka_msgs/action/grasp.hpp"
 
 using namespace rapidjson;
@@ -77,43 +77,6 @@ void move_predefined(moveit::planning_interface::MoveGroupInterface& move_group,
         move_group.move();
 }
 
-void add_collision(moveit::planning_interface::MoveGroupInterface& move_group,
-                   moveit::planning_interface::PlanningSceneInterface& planning_scene_interface)
-{
-    moveit_msgs::msg::CollisionObject collision_object;
-    collision_object.header.frame_id = move_group.getPlanningFrame();
-
-    shape_msgs::msg::SolidPrimitive primitive;
-    primitive.type = primitive.BOX;
-    primitive.dimensions.resize(3);
-    primitive.dimensions[primitive.BOX_X] = 1.0;
-    primitive.dimensions[primitive.BOX_Y] = 2.0;
-    primitive.dimensions[primitive.BOX_Z] = 0.1;
-
-    collision_object.id = "world_plane1";
-
-    geometry_msgs::msg::Pose box_pose;
-    box_pose.orientation.w = 1.0;
-    box_pose.position.x = 0.6;
-    box_pose.position.y = 0.0;
-    box_pose.position.z = -0.08;
-
-    collision_object.primitives.push_back(primitive);
-    collision_object.primitive_poses.push_back(box_pose);
-
-//    box_pose.position.y = -0.7;
-//    collision_object.primitives.push_back(primitive);
-//    collision_object.primitive_poses.push_back(box_pose);
-
-    collision_object.operation = collision_object.ADD;
-
-    std::vector<moveit_msgs::msg::CollisionObject> collision_objects;
-    collision_objects.push_back(collision_object);
-
-    RCLCPP_INFO(LOGGER, "Add an object into the world");
-    planning_scene_interface.addCollisionObjects(collision_objects);
-}
-
 void angle_modify(geometry_msgs::msg::PoseStamped& poseStamped)
 {
     tf2::Quaternion q_orig, q_rot, q_new;
@@ -131,6 +94,198 @@ void angle_modify(geometry_msgs::msg::PoseStamped& poseStamped)
     tf2::convert(q_new, poseStamped.pose.orientation);
 }
 
+void json_read(const std::string& file_name, int& num,
+               std::vector<std::vector<double>>& translation,
+               std::vector<std::vector<double>>& rotation,
+               std::vector<double>& joint_positions)
+{
+    std::ifstream json_file("/home/armine/ROS2/franka_ws/src/franka_panda_RL/franka_control/"+file_name);
+    std::stringstream json_buf;
+    json_buf << json_file.rdbuf();
+    std::string json;
+    json_buf >> std::quoted(json);
+
+    Document document;
+    document.Parse(json.c_str());
+
+    RCLCPP_INFO(LOGGER, "---------------JSON INFO-------------------");
+    // num
+    num = document["num"].GetInt();
+    RCLCPP_INFO(LOGGER, "num = %d", num);
+    // translation
+    RCLCPP_INFO(LOGGER, "translation:");
+    const Value& translation_ = document["translation"];
+    assert(translation_.IsArray());
+    for (auto& i : translation_.GetArray())
+    {
+        std::vector<double> tmp;
+        for(auto& j : i.GetArray())
+        {
+            RCLCPP_INFO(LOGGER, "%f, ", j.GetDouble());
+            tmp.push_back(j.GetDouble());
+        }
+        translation.push_back(tmp);
+    }
+    // rotation
+    RCLCPP_INFO(LOGGER, "rotation:");
+    const Value& rotation_ = document["rotation"];
+    assert(rotation_.IsArray());
+    for (auto& i : rotation_.GetArray())
+    {
+        std::vector<double> tmp;
+        for(auto& j : i.GetArray())
+        {
+            RCLCPP_INFO(LOGGER, "%f, ", j.GetDouble());
+            tmp.push_back(j.GetDouble());
+        }
+        rotation.push_back(tmp);
+    }
+    // joint_positions
+    RCLCPP_INFO(LOGGER, "joint_positions:");
+    const Value& joint_positions_ = document["joint_positions"];
+    assert(joint_positions_.IsArray());
+    for (auto& i : joint_positions_.GetArray())
+    {
+        joint_positions.push_back(i.GetDouble());
+    }
+    RCLCPP_INFO(LOGGER, "---------------JSON INFO-------------------");
+}
+
+void json_read(const std::string& file_name, int& num,
+               std::vector<tf2::Vector3>& translation,
+               std::vector<tf2::Quaternion>& rotation,
+               std::vector<double>& joint_positions)
+{
+    /* The overloaded function adapted to ROS types. */
+    std::ifstream json_file("/home/armine/ROS2/franka_ws/src/franka_panda_RL/franka_control/"+file_name);
+    std::stringstream json_buf;
+    json_buf << json_file.rdbuf();
+    std::string json;
+    json_buf >> std::quoted(json);
+
+    Document document;
+    document.Parse(json.c_str());
+
+    /* Save the parsed info into class public vars and print them out. */
+    RCLCPP_INFO(LOGGER, "---------------JSON INFO-------------------");
+    // num
+    num = document["num"].GetInt();
+    RCLCPP_INFO(LOGGER, "num = %d", num);
+    // translation
+    RCLCPP_INFO(LOGGER, "translation:");
+    const Value& translation_ = document["translation"];
+    assert(translation_.IsArray());
+    for (auto& i : translation_.GetArray())
+    {
+        std::vector<double> tmp;
+        for(auto& j : i.GetArray())
+        {
+            RCLCPP_INFO(LOGGER, "%f, ", j.GetDouble());
+            tmp.push_back(j.GetDouble());
+        }
+        assert(tmp.size() == 3);
+        translation.emplace_back(tmp[0], tmp[1], tmp[2]);
+    }
+    // rotation
+    RCLCPP_INFO(LOGGER, "rotation:");
+    const Value& rotation_ = document["rotation"];
+    assert(rotation_.IsArray());
+    for (auto& i : rotation_.GetArray())
+    {
+        std::vector<double> tmp;
+        for(auto& j : i.GetArray())
+        {
+            RCLCPP_INFO(LOGGER, "%f, ", j.GetDouble());
+            tmp.push_back(j.GetDouble());
+        }
+        assert(tmp.size() == 4);
+        rotation.emplace_back(tmp[0], tmp[1], tmp[2], tmp[3]);
+    }
+    // joint_positions
+    RCLCPP_INFO(LOGGER, "joint_positions:");
+    const Value& joint_positions_ = document["joint_positions"];
+    assert(joint_positions_.IsArray());
+    for (auto& i : joint_positions_.GetArray())
+    {
+        RCLCPP_INFO(LOGGER, "%f, ", i.GetDouble());
+        joint_positions.push_back(i.GetDouble());
+    }
+    RCLCPP_INFO(LOGGER, "---------------JSON INFO-------------------");
+}
+
+void json_read(const std::string& file_name, int& num,
+               std::vector<geometry_msgs::msg::PoseStamped>& pose,
+               std::vector<double>& joint_positions)
+{
+    /* The overloaded function adapted to ROS types. */
+    std::ifstream json_file("/home/armine/ROS2/franka_ws/src/franka_panda_RL/franka_control/"+file_name);
+    std::stringstream json_buf;
+    json_buf << json_file.rdbuf();
+    std::string json;
+    json_buf >> std::quoted(json);
+
+    Document document;
+    document.Parse(json.c_str());
+
+    /* Save the parsed info into class public vars and print them out. */
+    RCLCPP_INFO(LOGGER, "---------------JSON INFO-------------------");
+    // num
+    num = document["num"].GetInt();
+    RCLCPP_INFO(LOGGER, "num = %d", num);
+    // translation
+    RCLCPP_INFO(LOGGER, "translation:");
+    const Value& translation_ = document["translation"];
+    assert(translation_.IsArray());
+    std::vector<geometry_msgs::msg::Point> translation;
+    for (auto& i : translation_.GetArray())
+    {
+        std::vector<double> tmp;
+        for(auto& j : i.GetArray())
+        {
+            RCLCPP_INFO(LOGGER, "%f, ", j.GetDouble());
+            tmp.push_back(j.GetDouble());
+        }
+        assert(tmp.size() == 3);
+        geometry_msgs::msg::Point p;
+        p.x = tmp[0]; p.y = tmp[1]; p.z = tmp[2];
+        translation.push_back(p);
+    }
+    // rotation
+    RCLCPP_INFO(LOGGER, "rotation:");
+    const Value& rotation_ = document["rotation"];
+    assert(rotation_.IsArray());
+    std::vector<geometry_msgs::msg::Quaternion> rotation;
+    for (auto& i : rotation_.GetArray())
+    {
+        std::vector<double> tmp;
+        for(auto& j : i.GetArray())
+        {
+            RCLCPP_INFO(LOGGER, "%f, ", j.GetDouble());
+            tmp.push_back(j.GetDouble());
+        }
+        assert(tmp.size() == 4);
+        geometry_msgs::msg::Quaternion q;
+        q.x = tmp[0]; q.y = tmp[1]; q.z = tmp[2]; q.w = tmp[3];
+        rotation.push_back(q);
+    }
+    for (size_t i; i < translation.size(); i++)
+    {
+        geometry_msgs::msg::PoseStamped p;
+        p.pose.position = translation[i]; p.pose.orientation = rotation[i];
+        pose.push_back(p);
+    }
+    // joint_positions
+    RCLCPP_INFO(LOGGER, "joint_positions:");
+    const Value& joint_positions_ = document["joint_positions"];
+    assert(joint_positions_.IsArray());
+    for (auto& i : joint_positions_.GetArray())
+    {
+        RCLCPP_INFO(LOGGER, "%f, ", i.GetDouble());
+        joint_positions.push_back(i.GetDouble());
+    }
+    RCLCPP_INFO(LOGGER, "---------------JSON INFO-------------------");
+}
+
 class MoveitControl : public rclcpp::Node
 {
 
@@ -138,15 +293,12 @@ public:
     MoveitControl()
             : Node("moveit_control")
     {
-        this->declare_parameter("shutdown", 0);
-        this->declare_parameter("next", 0);
+        this->declare_parameter("next", false);
 
         tf_buffer_ = std::make_shared<tf2_ros::Buffer>(this->get_clock());
         transform_listener_ = std::make_shared<tf2_ros::TransformListener>(*tf_buffer_);
 
 //        json_read("demo_data.json", this->r_num, this->r_translation, this->r_rotation, this->r_joint_positions);
-        json_read("demo_data.json", this->r_num, this->r_pose, this->r_joint_positions);
-        json_read("repo_data.json", this->r_num_repo, this->r_pose_repo, this->r_joint_positions_repo);
 
         image_subscription_ = this->create_subscription<sensor_msgs::msg::Image>(
                 "/camera/color/image_raw", 3, std::bind(&MoveitControl::image_callback, this, std::placeholders::_1)
@@ -192,7 +344,7 @@ public:
         goal_msg.epsilon.inner = 0.01;
         goal_msg.epsilon.outer = 0.01;
 
-        RCLCPP_INFO(LOGGER, "Sending goal");
+        RCLCPP_INFO(LOGGER, "Sending hand action goal");
 
         auto send_goal_options = rclcpp_action::Client<franka_msgs::action::Grasp>::SendGoalOptions();
 //        send_goal_options.goal_response_callback =
@@ -438,198 +590,6 @@ private:
         return(a.id < b.id);
     }
 
-    void json_read(const std::string& file_name, int& num,
-                   std::vector<std::vector<double>>& translation,
-                   std::vector<std::vector<double>>& rotation,
-                   std::vector<double>& joint_positions)
-    {
-        std::ifstream json_file("/home/armine/ROS2/franka_ws/src/franka_panda_RL/franka_control/"+file_name);
-        std::stringstream json_buf;
-        json_buf << json_file.rdbuf();
-        std::string json;
-        json_buf >> std::quoted(json);
-
-        Document document;
-        document.Parse(json.c_str());
-
-        RCLCPP_INFO(LOGGER, "---------------JSON INFO-------------------");
-        // num
-        num = document["num"].GetInt();
-        RCLCPP_INFO(LOGGER, "num = %d", num);
-        // translation
-        RCLCPP_INFO(LOGGER, "translation:");
-        const Value& translation_ = document["translation"];
-        assert(translation_.IsArray());
-        for (auto& i : translation_.GetArray())
-        {
-            std::vector<double> tmp;
-            for(auto& j : i.GetArray())
-            {
-                RCLCPP_INFO(LOGGER, "%f, ", j.GetDouble());
-                tmp.push_back(j.GetDouble());
-            }
-            translation.push_back(tmp);
-        }
-        // rotation
-        RCLCPP_INFO(LOGGER, "rotation:");
-        const Value& rotation_ = document["rotation"];
-        assert(rotation_.IsArray());
-        for (auto& i : rotation_.GetArray())
-        {
-            std::vector<double> tmp;
-            for(auto& j : i.GetArray())
-            {
-                RCLCPP_INFO(LOGGER, "%f, ", j.GetDouble());
-                tmp.push_back(j.GetDouble());
-            }
-            rotation.push_back(tmp);
-        }
-        // joint_positions
-        RCLCPP_INFO(LOGGER, "joint_positions:");
-        const Value& joint_positions_ = document["joint_positions"];
-        assert(joint_positions_.IsArray());
-        for (auto& i : joint_positions_.GetArray())
-        {
-            joint_positions.push_back(i.GetDouble());
-        }
-        RCLCPP_INFO(LOGGER, "---------------JSON INFO-------------------");
-    }
-
-    void json_read(const std::string& file_name, int& num,
-                   std::vector<tf2::Vector3>& translation,
-                   std::vector<tf2::Quaternion>& rotation,
-                   std::vector<double>& joint_positions)
-    {
-        /* The overloaded function adapted to ROS types. */
-        std::ifstream json_file("/home/armine/ROS2/franka_ws/src/franka_panda_RL/franka_control/"+file_name);
-        std::stringstream json_buf;
-        json_buf << json_file.rdbuf();
-        std::string json;
-        json_buf >> std::quoted(json);
-
-        Document document;
-        document.Parse(json.c_str());
-
-        /* Save the parsed info into class public vars and print them out. */
-        RCLCPP_INFO(LOGGER, "---------------JSON INFO-------------------");
-        // num
-        num = document["num"].GetInt();
-        RCLCPP_INFO(LOGGER, "num = %d", num);
-        // translation
-        RCLCPP_INFO(LOGGER, "translation:");
-        const Value& translation_ = document["translation"];
-        assert(translation_.IsArray());
-        for (auto& i : translation_.GetArray())
-        {
-            std::vector<double> tmp;
-            for(auto& j : i.GetArray())
-            {
-                RCLCPP_INFO(LOGGER, "%f, ", j.GetDouble());
-                tmp.push_back(j.GetDouble());
-            }
-            assert(tmp.size() == 3);
-            translation.emplace_back(tmp[0], tmp[1], tmp[2]);
-        }
-        // rotation
-        RCLCPP_INFO(LOGGER, "rotation:");
-        const Value& rotation_ = document["rotation"];
-        assert(rotation_.IsArray());
-        for (auto& i : rotation_.GetArray())
-        {
-            std::vector<double> tmp;
-            for(auto& j : i.GetArray())
-            {
-                RCLCPP_INFO(LOGGER, "%f, ", j.GetDouble());
-                tmp.push_back(j.GetDouble());
-            }
-            assert(tmp.size() == 4);
-            rotation.emplace_back(tmp[0], tmp[1], tmp[2], tmp[3]);
-        }
-        // joint_positions
-        RCLCPP_INFO(LOGGER, "joint_positions:");
-        const Value& joint_positions_ = document["joint_positions"];
-        assert(joint_positions_.IsArray());
-        for (auto& i : joint_positions_.GetArray())
-        {
-            RCLCPP_INFO(LOGGER, "%f, ", i.GetDouble());
-            joint_positions.push_back(i.GetDouble());
-        }
-        RCLCPP_INFO(LOGGER, "---------------JSON INFO-------------------");
-    }
-
-    void json_read(const std::string& file_name, int& num,
-                   std::vector<geometry_msgs::msg::PoseStamped>& pose,
-                   std::vector<double>& joint_positions)
-    {
-        /* The overloaded function adapted to ROS types. */
-        std::ifstream json_file("/home/armine/ROS2/franka_ws/src/franka_panda_RL/franka_control/"+file_name);
-        std::stringstream json_buf;
-        json_buf << json_file.rdbuf();
-        std::string json;
-        json_buf >> std::quoted(json);
-
-        Document document;
-        document.Parse(json.c_str());
-
-        /* Save the parsed info into class public vars and print them out. */
-        RCLCPP_INFO(LOGGER, "---------------JSON INFO-------------------");
-        // num
-        num = document["num"].GetInt();
-        RCLCPP_INFO(LOGGER, "num = %d", num);
-        // translation
-        RCLCPP_INFO(LOGGER, "translation:");
-        const Value& translation_ = document["translation"];
-        assert(translation_.IsArray());
-        std::vector<geometry_msgs::msg::Point> translation;
-        for (auto& i : translation_.GetArray())
-        {
-            std::vector<double> tmp;
-            for(auto& j : i.GetArray())
-            {
-                RCLCPP_INFO(LOGGER, "%f, ", j.GetDouble());
-                tmp.push_back(j.GetDouble());
-            }
-            assert(tmp.size() == 3);
-            geometry_msgs::msg::Point p;
-            p.x = tmp[0]; p.y = tmp[1]; p.z = tmp[2];
-            translation.push_back(p);
-        }
-        // rotation
-        RCLCPP_INFO(LOGGER, "rotation:");
-        const Value& rotation_ = document["rotation"];
-        assert(rotation_.IsArray());
-        std::vector<geometry_msgs::msg::Quaternion> rotation;
-        for (auto& i : rotation_.GetArray())
-        {
-            std::vector<double> tmp;
-            for(auto& j : i.GetArray())
-            {
-                RCLCPP_INFO(LOGGER, "%f, ", j.GetDouble());
-                tmp.push_back(j.GetDouble());
-            }
-            assert(tmp.size() == 4);
-            geometry_msgs::msg::Quaternion q;
-            q.x = tmp[0]; q.y = tmp[1]; q.z = tmp[2]; q.w = tmp[3];
-            rotation.push_back(q);
-        }
-        for (size_t i; i < translation.size(); i++)
-        {
-            geometry_msgs::msg::PoseStamped p;
-            p.pose.position = translation[i]; p.pose.orientation = rotation[i];
-            pose.push_back(p);
-        }
-        // joint_positions
-        RCLCPP_INFO(LOGGER, "joint_positions:");
-        const Value& joint_positions_ = document["joint_positions"];
-        assert(joint_positions_.IsArray());
-        for (auto& i : joint_positions_.GetArray())
-        {
-            RCLCPP_INFO(LOGGER, "%f, ", i.GetDouble());
-            joint_positions.push_back(i.GetDouble());
-        }
-        RCLCPP_INFO(LOGGER, "---------------JSON INFO-------------------");
-    }
-
     using GoalHandleGrasp = rclcpp_action::ClientGoalHandle<franka_msgs::action::Grasp>;
     void result_callback(const GoalHandleGrasp::WrappedResult & result)
     {
@@ -722,8 +682,8 @@ private:
 
     float aruco_size = 0.018;
     cv::Mat camera_k = (cv::Mat_<double>(3,3) <<
-            906.3109741210938, 0.0, 636.7540283203125,
-            0.0, 905.7764892578125, 352.17510986328125,
+            1359.4664306640625, 0.0, 955.1310424804688,
+            0.0, 1358.664794921875, 528.2626342773438,
             0.0, 0.0, 1.0);
     cv::Mat camera_d = (cv::Mat_<double>(1,5) << 0.0, 0.0, 0.0, 0.0, 0.0);
 
@@ -743,22 +703,29 @@ int main(int argc, char **argv)
     std::thread([&executor]() { executor.spin(); }).detach();
     rclcpp::sleep_for(std::chrono::seconds(2));
 
+    // Moveit planning interface init
     static const std::string PLANNING_GROUP = "panda_manipulator";
     moveit::planning_interface::MoveGroupInterface move_group(move_group_node, PLANNING_GROUP);
     moveit::planning_interface::PlanningSceneInterface planning_scene_interface;
     move_group.setPlannerId("RRTkConfigDefault");
     move_group.setMaxVelocityScalingFactor(0.25);
     move_group.setMaxAccelerationScalingFactor(0.2);
-    move_group.setPlanningTime(2);
+    move_group.setPlanningTime(5);
     move_group.allowReplanning(true);
-    add_collision(move_group, planning_scene_interface);
-//    move_group_node->detect_flag = true;
+    add_collision_half(move_group, planning_scene_interface);
 
+// ****************Task Begin*****************
+    // Detect and save the targets into json file
+//    move_predefined(move_group, "home");
+    move_predefined(move_group, "waiting");
+    while(!move_group_node->get_parameter("next").get_parameter_value().get<bool>());
+    json_read("demo_data.json", move_group_node->r_num, move_group_node->r_pose, move_group_node->r_joint_positions);
+    json_read("repo_data.json", move_group_node->r_num_repo, move_group_node->r_pose_repo, move_group_node->r_joint_positions_repo);
     move_predefined(move_group, "home");
-//    move_predefined(move_group, "waiting");
+
     for(int count=0; count<move_group_node->r_num; count++)
     {
-//        move_predefined(move_group, move_group_node->r_joint_positions_repo);
+        // Move to fixed pose
         if(count < 3)
         {
             if(count == 0)
@@ -770,117 +737,45 @@ int main(int argc, char **argv)
             move_group_node->hand_action(false);
         }
 
-        rclcpp::sleep_for(std::chrono::seconds(1));
-
-        move_predefined(move_group, "home");
-
-        rclcpp::sleep_for(std::chrono::seconds(1));
-
+        // Move to predefined detect pose
+//        move_predefined(move_group, "home");
         move_predefined(move_group, "detect");
-
-        rclcpp::sleep_for(std::chrono::seconds(1));
 
         geometry_msgs::msg::TransformStamped abs_trans_cam;
         geometry_msgs::msg::PoseStamped target_in, target_tmp;
         geometry_msgs::msg::Pose target;
 
-//        for(int i = 0; i<10; i++)
-//        {
-//            if(move_group_node->transform_get("panda_link0", "camera_color_optical_frame",abs_trans_cam))
-//            {
-//                // Transform to get object pose
-//                target_in = move_group_node->r_pose_repo[count];
-//                auto tvec_tmp = move_group_node->trans;
-//                target_in.pose.position.x += tvec_tmp[0]; target_tmp.pose.position.y += tvec_tmp[1]; target_tmp.pose.position.z += tvec_tmp[2];
-//
-//                // Move to grasp
-//                tf2::doTransform(target_in, target_tmp, abs_trans_cam);
-//
-//                target = target_tmp.pose;
-//                target.position.z = 0.01;
-//                move_group.setPoseTarget(target, "panda_hand_tcp");
-//                moveit::planning_interface::MoveGroupInterface::Plan my_plan;
-//                bool success = (move_group.plan(my_plan) == moveit::planning_interface::MoveItErrorCode::SUCCESS);
-//                if(success)
-//                    move_group.move();
-//                else
-//                {
-//                    ;
-////                    angle_modify(target_in);
-////
-////                    tf2::doTransform(target_in, target_tmp, abs_trans_cam);
-////
-////                    target = target_tmp.pose;
-////                    target.position.z = 0.03;
-////                    move_group.setPoseTarget(target, "panda_hand_tcp");
-////
-////                    move_group.move();
-//                }
-//
-//                // Grasp
-//                move_group_node->hand_action(false);
-//                move_predefined(move_group, move_group_node->r_joint_positions_repo);
-//                rclcpp::sleep_for(std::chrono::seconds(1));
-//                break;
-//            }
-//        }
-//
-//        move_predefined(move_group, move_group_node->r_joint_positions);
-////        move_group_node->detect_flag = true;
-//        rclcpp::sleep_for(std::chrono::seconds(1));
 
-        for(int i = 0; i<10; i++)
+        if(move_group_node->transform_get("panda_link0", "camera_color_optical_frame",abs_trans_cam))
         {
-            if(move_group_node->transform_get("panda_link0", "camera_color_optical_frame",abs_trans_cam))
-            {
-                // Transform to get object pose
-                target_tmp = move_group_node->r_pose[count];
-                auto tvec_tmp = move_group_node->trans;
-                target_tmp.pose.position.x += tvec_tmp[0]; target_tmp.pose.position.y += tvec_tmp[1]; target_tmp.pose.position.z += tvec_tmp[2];
-                tf2::doTransform(target_tmp, target_tmp, abs_trans_cam);
+            // Transform to get object pose
+            target_tmp = move_group_node->r_pose[count];
+            auto tvec_tmp = move_group_node->trans;
+            target_tmp.pose.position.x += tvec_tmp[0];
+            target_tmp.pose.position.y += tvec_tmp[1];
+            target_tmp.pose.position.z += tvec_tmp[2];
+            tf2::doTransform(target_tmp, target_tmp, abs_trans_cam);
 
-                // Move to grasp
-                target = target_tmp.pose;
-                target.position.z = 0.02;
-//                move_group_node->detect_flag = false;
+            // Move to grasp
+            target = target_tmp.pose;
+            target.position.z = 0.02;
 
-//                for(size_t j = 0; j<5; j++)
-//                {
-//                    moveit::planning_interface::MoveGroupInterface::Plan my_plan;
-//                    bool success = (move_group.plan(my_plan) == moveit::planning_interface::MoveItErrorCode::SUCCESS);
-//                    if(success)
-//                    {
-//                        move_group.move();
-//                        break;
-//                    }
-//                }
+            move_group.setPoseTarget(target, "panda_hand_tcp");
+            move_group.move();
 
-                move_group.setPoseTarget(target, "panda_hand_tcp");
-                move_group.move();
+            move_group_node->hand_action(true);
 
-                move_group_node->hand_action(true);
-
-                target.position.z = 0.2;
-                move_group.setPoseTarget(target, "panda_hand_tcp");
-                move_group.move();
-                break;
-            }
+            target.position.z = 0.2;
+            move_group.setPoseTarget(target, "panda_hand_tcp");
+            move_group.move();
         }
-
-
-        move_predefined(move_group, "home");
-//        move_predefined(move_group, move_group_node->r_joint_positions);
-//        move_group_node->detect_flag = true;
-
-//        while(!move_group_node->get_parameter("next").get_parameter_value().get<int>());
-//        move_group_node->set_parameter(rclcpp::Parameter("next", 0));
+        move_predefined(move_group, "detect");
+//        move_predefined(move_group, "home");
     }
-
-    while(!move_group_node->get_parameter("next").get_parameter_value().get<int>());
-    move_group_node->set_parameter(rclcpp::Parameter("next", 0));
     move_predefined(move_group, "waiting");
-//    while(!move_group_node->get_parameter("shutdown").get_parameter_value().get<int>());
+//            move_predefined(move_group, "home");
 
+    // ****************Task End*****************
     rclcpp::shutdown();
     return 0;
 }

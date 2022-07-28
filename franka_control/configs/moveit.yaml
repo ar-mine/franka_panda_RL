@@ -1,4 +1,6 @@
 # round_views
-position: [0.55, 0.0, 0.0]
-angel: 60.0
-distance: 0.25
+position: [0.55, 0.0, -0.02]
+angel: [80.0, 70.0, 60.0, 55.0]
+distance: [0.30, 0.30, 0.30, 0.30]
+factor: [8.0, 12.0, 16.0, 20.0]
+run_flag: false

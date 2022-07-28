@@ -12,7 +12,10 @@
 bool moveit_move_ready(moveit::planning_interface::MoveGroupInterface& move_group,
                        rclcpp::Logger& LOGGER);
 
-void add_collision(moveit::planning_interface::MoveGroupInterface& move_group,
+void add_collision_full(moveit::planning_interface::MoveGroupInterface& move_group,
                    moveit::planning_interface::PlanningSceneInterface& planning_scene_interface);
+
+void add_collision_half(moveit::planning_interface::MoveGroupInterface& move_group,
+                        moveit::planning_interface::PlanningSceneInterface& planning_scene_interface);
 
 #endif //BUILD_MOVEIT_UTILS_H

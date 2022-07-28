@@ -1,0 +1,6 @@
+env/*
+model.pth.tar
+__pycache__/*
+.idea/*
+duck_video/
+templates/

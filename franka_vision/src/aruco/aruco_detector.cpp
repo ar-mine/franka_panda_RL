@@ -6,37 +6,40 @@
 
 namespace franka_vision
 {
-    ArucoDetector::ArucoDetector(const rclcpp::NodeOptions &options) :
-    Node("aruco_detector_node", options)
+    ArucoDetector::ArucoDetector(const std::string& node_name,
+                                 const std::string& img_tpc_in,
+                                 const std::string& img_tpc_out) :
+    Node(node_name)
     {
-        const std::string node_name = "aruco_detector_node";
-        const std::string img_tpc_in = "/camera/color/image_raw";
-        const std::string& img_tpc_out = "/detected_shape";
+        this->node_name = node_name;
+        this->img_tpc_in = img_tpc_in;
+        this->img_tpc_out = node_name+"/"+img_tpc_out;
 
-        this->declare_parameter("visualize_flag", 1);
-        this->declare_parameter("tf_flag", 1);
-        this->declare_parameter("marker_flag", 1);
-
-        this->declare_parameter("prefix", "");
-        this->declare_parameter("link_name", "camera_color_optical_frame");
-        this->declare_parameter("marker_size", 0.018);
-
-        if(this->get_parameter("tf_flag").get_parameter_value().get<int>())
-        {
-            tf_buffer_ = std::make_shared<tf2_ros::Buffer>(this->get_clock());
-            transform_listener_ = std::make_shared<tf2_ros::TransformListener>(*tf_buffer_);
-        }
+//        this->declare_parameter("visualize_flag", 1);
+//        this->declare_parameter("tf_flag", 1);
+//        this->declare_parameter("marker_flag", 1);
+//
+//        this->declare_parameter("prefix", "");
+//        this->declare_parameter("link_name", "camera_color_optical_frame");
+//
+//        if(this->get_parameter("tf_flag").get_parameter_value().get<int>())
+//        {
+//            tf_buffer_ = std::make_shared<tf2_ros::Buffer>(this->get_clock());
+//            transform_listener_ = std::make_shared<tf2_ros::TransformListener>(*tf_buffer_);
+//        }
 
         image_subscription_ = this->create_subscription<sensor_msgs::msg::Image>(
-                "/camera/color/image_raw", rclcpp::SensorDataQoS(), std::bind(&ArucoDetector::image_callback, this, std::placeholders::_1)
+                this->img_tpc_in, rclcpp::SensorDataQoS(),
+                std::bind(&ArucoDetector::image_callback, this, std::placeholders::_1)
         );
         image_publisher_ = this->create_publisher<sensor_msgs::msg::Image>(
-                "/detected_shape", rclcpp::SensorDataQoS()
+                this->img_tpc_out, rclcpp::QoS(10)
         );
-        markers_publisher_ = this->create_publisher<visualization_msgs::msg::MarkerArray>(
-                "/markers", rclcpp::QoS(10)
-        );
+//        markers_publisher_ = this->create_publisher<visualization_msgs::msg::MarkerArray>(
+//                "/markers", rclcpp::QoS(10)
+//        );
 
+        RCLCPP_INFO(logger, node_name+" initialization is completed!");
 
     }
 
@@ -89,11 +92,9 @@ namespace franka_vision
         this->img_out = image.clone();
 
         // Publish for visualization
-        cv_ptr->image = image;
-        image_publisher_->publish(*cv_ptr->toImageMsg());
+        sensor_msgs::msg::Image::SharedPtr img_msg =
+                cv_bridge::CvImage(std_msgs::msg::Header(), "bgr8", image).toImageMsg();
+        image_publisher_->publish(*img_msg);
     }
 }
 
-#include "rclcpp_components/register_node_macro.hpp"
-
-RCLCPP_COMPONENTS_REGISTER_NODE(franka_vision::ArucoDetector)

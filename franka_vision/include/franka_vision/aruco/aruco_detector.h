@@ -32,7 +32,28 @@ namespace franka_vision
     class ArucoDetector : public rclcpp::Node
     {
     public:
-        explicit ArucoDetector(const rclcpp::NodeOptions &options);
+        ArucoDetector(const std::string& node_name, const std::string& img_tpc_in, const std::string& img_tpc_out);
+
+        void image_callback(const sensor_msgs::msg::Image::SharedPtr msg);
+        // Input parameters
+        std::string node_name;
+        std::string img_tpc_in;
+        std::string img_tpc_out;
+
+        // Logger
+        rclcpp::Logger logger = this->get_logger();
+        // Subscription && Publisher
+        rclcpp::Subscription<sensor_msgs::msg::Image>::SharedPtr image_subscription_;
+        rclcpp::Publisher<sensor_msgs::msg::Image>::SharedPtr image_publisher_;
+        rclcpp::Publisher<visualization_msgs::msg::MarkerArray>::SharedPtr markers_publisher_;
+
+        // The ros parameters can be assigned in yaml file
+        float aruco_size = 0.018;
+        cv::Mat camera_k = (cv::Mat_<double>(3,3) <<
+                1359.4664306640625, 0.0, 955.1310424804688,
+                0.0, 1358.664794921875, 528.2626342773438,
+                0.0, 0.0, 1.0);
+        cv::Mat camera_d = (cv::Mat_<double>(1,5) << 0.0, 0.0, 0.0, 0.0, 0.0);
 
         /* The variables exposed to show the results of detector(Also be published to ROS sever).
          *
@@ -43,20 +64,10 @@ namespace franka_vision
         cv::Mat img_in, img_out;
 
     private:
-        void image_callback(const sensor_msgs::msg::Image::SharedPtr msg);
-
-        // Logger
-        rclcpp::Logger logger = this->get_logger();
-
         // TF
         std::unique_ptr<tf2_ros::TransformBroadcaster> tf_broadcaster_;
         std::shared_ptr<tf2_ros::TransformListener> transform_listener_{nullptr};
         std::shared_ptr<tf2_ros::Buffer> tf_buffer_;
-
-        // Subscription && Publisher
-        rclcpp::Subscription<sensor_msgs::msg::Image>::SharedPtr image_subscription_;
-        rclcpp::Publisher<sensor_msgs::msg::Image>::SharedPtr image_publisher_;
-        rclcpp::Publisher<visualization_msgs::msg::MarkerArray>::SharedPtr markers_publisher_;
 
         // Detection parameters
         cv::Ptr<cv::aruco::DetectorParameters> parameters = cv::aruco::DetectorParameters::create();

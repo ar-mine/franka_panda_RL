@@ -1,5 +1,4 @@
-node = shape_detector
-
+node_name = shape_detector
 img_topic_in = /camera/color/image_raw
-img_topic_out = /detected_shape
-markers_topic = /markers
+img_topic_out = /shape_detector/detected_shape
+markers_topic = /shape_detector/markers

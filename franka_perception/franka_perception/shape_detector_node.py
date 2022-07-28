@@ -21,7 +21,7 @@ def config_parser():
     parser.add_argument('--config', is_config_file=True,
                         help='config file path', default="./configs/default.txt")
 
-    parser.add_argument("--node", type=str,
+    parser.add_argument("--node_name", type=str,
                         help='Node name')
     # Topic name
     parser.add_argument("--img_topic_in", type=str,
@@ -48,7 +48,7 @@ class ShapeDetectorNode(Node):
     def __init__(self):
         parser = config_parser()
         args = parser.parse_args()
-        super().__init__(args.node)
+        super().__init__(args.node_name)
 
         img_topic_in = args.img_topic_in
         img_topic_out = args.img_topic_out
@@ -60,14 +60,14 @@ class ShapeDetectorNode(Node):
         self.joint_states_subscription = self.create_subscription(JointState, "/joint_states",
                                                                   self.joint_states_callback, 1)
 
-        self.logger = rclpy.logging.get_logger(args.node)
+        self.logger = rclpy.logging.get_logger(args.node_name)
 
         self.bridge = CvBridge()
         self.lock = threading.RLock()
 
         # Camera parameters
-        self.camera_k = np.array([[906.3109741210938, 0.0, 636.7540283203125],
-                                  [0.0, 905.7764892578125, 352.17510986328125],
+        self.camera_k = np.array([[1359.4664306640625, 0.0, 955.1310424804688],
+                                  [0.0, 1358.664794921875, 528.2626342773438],
                                   [0.0, 0.0, 1.0]
                                   ])
         self.camera_d = np.array([0.0, 0.0, 0.0, 0.0, 0.0])

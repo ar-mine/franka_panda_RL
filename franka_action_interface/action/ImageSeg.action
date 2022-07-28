@@ -1,0 +1,5 @@
+string image_dir_path
+---
+bool success_flag
+---
+string image_completed
