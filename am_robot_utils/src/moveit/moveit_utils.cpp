@@ -48,14 +48,14 @@ void Am::add_collision_full(moveit::planning_interface::MoveGroupInterface& move
     box_pose.orientation.w = 1.0;
     box_pose.position.x = -0.2;
     box_pose.position.y = 0.6;
-    box_pose.position.z = -0.05;
+    box_pose.position.z = -0.07;
     collision_object.primitives.push_back(primitive);
     collision_object.primitive_poses.push_back(box_pose);
 
     box_pose.orientation.w = 1.0;
     box_pose.position.x = -0.2;
     box_pose.position.y = -0.6;
-    box_pose.position.z = -0.05;
+    box_pose.position.z = -0.07;
     collision_object.primitives.push_back(primitive);
     collision_object.primitive_poses.push_back(box_pose);
 

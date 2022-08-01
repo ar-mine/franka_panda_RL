@@ -51,13 +51,12 @@ set(CV_DEPEND
 
 set(
         EXECUTABLE
-        round_move
-        pick_place
+        layout_repeat_demo
 )
 
 add_executable(layout_repeat_demo layout_repeat_demo.cpp)
 
-# layout_copy_demo
+# layout_repeat_demo
 ament_target_dependencies(layout_repeat_demo
         ${THIS_PACKAGE_INCLUDE_DEPENDS}
         ${MOVEIT_DEPEND}

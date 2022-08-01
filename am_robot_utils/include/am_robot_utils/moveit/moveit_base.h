@@ -19,7 +19,8 @@ namespace Am {
     class MoveitBase : public rclcpp::Node {
     public:
         /// Constructor
-        MoveitBase(const std::string &node_name, const rclcpp::NodeOptions &node_options, int mode);
+        MoveitBase(const std::string &node_name, const rclcpp::NodeOptions &node_options, int mode,
+                   double max_vel=0.15, double max_acc=0.15);
 
         /// Move group interface and planning scene interface for the robot
         moveit::planning_interface::MoveGroupInterface move_group_;
@@ -41,7 +42,7 @@ namespace Am {
         /*********************** Control mode 2(function)  ********************************/
         bool moveit_move_ready(const rclcpp::Logger &LOGGER);
 
-        void hand_action(bool open_close, const rclcpp::Logger &LOGGER);
+        void hand_action(bool open_close, const rclcpp::Logger &LOGGER, double target_width=0.0);
 
 
     private:

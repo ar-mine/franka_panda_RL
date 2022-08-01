@@ -65,7 +65,6 @@ install(TARGETS
         LIBRARY DESTINATION lib)
 
 add_executable(moveit_control moveit_control.cpp)
-add_executable(layout_copy_demo layout_copy_demo.cpp)
 add_executable(moveit_circle moveit_circle.cpp)
 add_executable(follow_targets_node follow_targets_node.cpp)
 add_executable(hand_process_node hand_process_node.cpp)
@@ -117,19 +116,6 @@ target_link_libraries(round_views
         moveit_utils_lib franka_utils_lib)
 install(TARGETS
         round_views
-        DESTINATION lib/${PROJECT_NAME}
-        )
-
-# round_views
-ament_target_dependencies(layout_copy_demo
-        ${THIS_PACKAGE_INCLUDE_DEPENDS}
-        ${MOVEIT_DEPEND}
-        ${CV_DEPEND}
-        )
-target_link_libraries(layout_copy_demo
-        moveit_utils_lib franka_utils_lib)
-install(TARGETS
-        layout_copy_demo
         DESTINATION lib/${PROJECT_NAME}
         )
 

@@ -1,12 +1,13 @@
 #include "am_robot_utils/moveit/moveit_base.h"
 
-Am::MoveitBase::MoveitBase(const std::string& node_name, const rclcpp::NodeOptions& node_options, int mode)
+Am::MoveitBase::MoveitBase(const std::string& node_name, const rclcpp::NodeOptions& node_options, int mode,
+                           double max_vel, double max_acc)
 : Node(node_name, node_options),
 move_group_(std::shared_ptr<rclcpp::Node>(std::move(this)), MOVE_GROUP)
 {
     // Use upper joint velocity and acceleration limits
-    this->move_group_.setMaxAccelerationScalingFactor(0.15);
-    this->move_group_.setMaxVelocityScalingFactor(0.15);
+    this->move_group_.setMaxAccelerationScalingFactor(max_acc);
+    this->move_group_.setMaxVelocityScalingFactor(max_vel);
 
     // Set Planner
     this->move_group_.setPlannerId("RRTConnectkConfigDefault");
@@ -28,7 +29,7 @@ move_group_(std::shared_ptr<rclcpp::Node>(std::move(this)), MOVE_GROUP)
             this, "/panda_gripper/grasp");
 
     // Add collision to planning scene
-    add_collision_full(move_group_, planning_scene_interface_);
+    add_collision_half(move_group_, planning_scene_interface_);
 
     // Sleep to ensure system stable
     rclcpp::sleep_for(std::chrono::seconds(2));
@@ -87,7 +88,7 @@ bool Am::MoveitBase::moveit_move_ready(const rclcpp::Logger& LOGGER)
     return success;
 }
 
-void Am::MoveitBase::hand_action(bool open_close, const rclcpp::Logger& LOGGER)
+void Am::MoveitBase::hand_action(bool open_close, const rclcpp::Logger& LOGGER, double target_width)
 {
 
 //        this->timer_->cancel();
@@ -101,11 +102,11 @@ void Am::MoveitBase::hand_action(bool open_close, const rclcpp::Logger& LOGGER)
     if(open_close)
         goal_msg.width = 0.18;
     else
-        goal_msg.width = 0.02;
+        goal_msg.width = target_width;
     goal_msg.speed = 0.04;
     goal_msg.force = 50;
-    goal_msg.epsilon.inner = 0;
-    goal_msg.epsilon.outer = 0;
+    goal_msg.epsilon.inner = 0.01;
+    goal_msg.epsilon.outer = 0.01;
 
     RCLCPP_INFO(LOGGER, "Sending hand action goal");
 

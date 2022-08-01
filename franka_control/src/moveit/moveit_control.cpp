@@ -754,6 +754,9 @@ int main(int argc, char **argv)
             target_tmp.pose.position.x += tvec_tmp[0];
             target_tmp.pose.position.y += tvec_tmp[1];
             target_tmp.pose.position.z += tvec_tmp[2];
+            RCLCPP_INFO(LOGGER, "position: %f, %f, %f, orientation: %f, %f, %f, %f"
+            , target_tmp.pose.position.x, target_tmp.pose.position.y, target_tmp.pose.position.z,
+                        target_tmp.pose.orientation.x, target_tmp.pose.orientation.y, target_tmp.pose.orientation.z, target_tmp.pose.orientation.w);
             tf2::doTransform(target_tmp, target_tmp, abs_trans_cam);
 
             // Move to grasp
