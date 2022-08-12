@@ -10,10 +10,6 @@ from DTOID.DTOIDModule import DTOIDModule
 from src.franka_panda_RL.franka_perception.franka_perception.base.ImageNodeBase import ImageNodeBase
 from utils.BoxDetector import BoxDetector
 
-camera_k = np.array([[604.207275390625, 0.0, 317.8360290527344],
-                     [0.0, 603.8510131835938, 234.7834014892578],
-                     [0.0, 0.0, 1.0]])
-
 
 class ObjDetectorNode(ImageNodeBase):
     def __init__(self, **kwargs):
@@ -37,7 +33,7 @@ class ObjDetectorNode(ImageNodeBase):
 
         self.timer = self.create_timer(0.05, self.timer_callback)
 
-        self.detector_model = DTOIDModule(template_dir="gum/output")
+        self.detector_model = DTOIDModule(template_dir="/home/armine/ROS2/franka_ws/record/output")
         self.box_detector = BoxDetector()
 
     def timer_callback(self):
@@ -57,7 +53,7 @@ class ObjDetectorNode(ImageNodeBase):
 
                     bbox_center = [(bbox[0]+bbox[2])//2, (bbox[1]+bbox[3])//2]
                     u_v_1 = np.array([bbox_center[0], bbox_center[1], 1]).T
-                    x_y_z = np.matmul(np.linalg.inv(camera_k), u_v_1) * avg_depth
+                    x_y_z = np.matmul(np.linalg.inv(self.camera_k), u_v_1) * avg_depth
                     # self.tf_handler(x_y_z, angel=angel)
 
                     flag.data = 1
@@ -75,7 +71,7 @@ class ObjDetectorNode(ImageNodeBase):
 
                         bbox_center = [(bbox[0]+bbox[2])//2, (bbox[1]+bbox[3])//2]
                         u_v_1 = np.array([bbox_center[0], bbox_center[1], 1]).T
-                        x_y_z_list[i] = np.matmul(np.linalg.inv(camera_k), u_v_1) * avg_depth
+                        x_y_z_list[i] = np.matmul(np.linalg.inv(self.camera_k), u_v_1) * avg_depth
             for i, bbox in enumerate(x_y_z_list):
                 self.tf_handler(x_y_z_list[i], child_frame="lattice_"+str(i), angel=180)
 
