@@ -23,7 +23,7 @@ class ObjDetectorNode(ImageNodeBase):
                   1 for detecting with object detection
                   2 for detecting box's lattice
         """
-        self.step = 0
+        self.step = 1
 
         self.rgb_img = None
         self.depth_img = None
@@ -39,26 +39,6 @@ class ObjDetectorNode(ImageNodeBase):
 
         self.detector_model = DTOIDModule(template_dir="gum/output")
         self.box_detector = BoxDetector()
-
-    def rgb_callback(self, rgb_msg):
-        try:
-            cv_image = self.bridge.imgmsg_to_cv2(rgb_msg, "bgr8")
-        except CvBridgeError as e:
-            self.logger.error(e)
-            return
-
-        # Used to show the processed image
-        self.rgb_img = cv_image.copy()
-
-    def depth_callback(self, depth_msg):
-        try:
-            cv_image = self.bridge.imgmsg_to_cv2(depth_msg, "passthrough")
-        except CvBridgeError as e:
-            self.logger.error(e)
-            return
-
-        # Used to show the processed image
-        self.depth_img = cv_image.copy()
 
     def timer_callback(self):
         if self.rgb_img is not None and self.depth_img is not None:

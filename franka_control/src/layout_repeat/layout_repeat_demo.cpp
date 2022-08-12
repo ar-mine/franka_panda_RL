@@ -62,9 +62,9 @@ int face_define(double ratio)
     // width    0.018   0.025   0.019   0
     if(ratio>=2.0 && ratio<=2.5)
         return 3;
-    else if(ratio>=1.4 && ratio<2.0)
+    else if(ratio>=1.5 && ratio<2.0)
         return 2;
-    else if(ratio>=1.0 && ratio<1.4)
+    else if(ratio>=1.0 && ratio<1.5)
         return 1;
     else
         return 0;
@@ -176,9 +176,11 @@ public:
                 int face = face_define(this->box_info_saved.data[count].size[1]/this->box_info_saved.data[count].size[0]);
                 move_to_box(count, face);
 
-
+                // Do pose transform
                 if(face==1)
                     transform_a2c();
+                else if(face==2)
+                    transform_a2b();
 
             }
             else
@@ -210,7 +212,7 @@ public:
 
                 this->hand_action(true, LOGGER);
 
-                abs_trans_cam.position.z = 0.2;
+                abs_trans_cam.position.z = 0.15;
                 this->move_group_.setPoseTarget(abs_trans_cam, "panda_hand_tcp");
                 this->move_group_.move();
             }
@@ -232,12 +234,43 @@ public:
 
         this->hand_action(true, LOGGER);
 
+        this->move_group_.setJointValueTarget({0.600, 1.290, -1.548, -2.440, -0.233, 1.748, 2.642});
+        this->move_group_.move();
+
         this->move_group_.setJointValueTarget({0.835, 0.158, -2.060, -2.888, 0.486, 2.789, -0.854+PI});
         this->move_group_.move();
 
         this->hand_action(false, LOGGER, 0.019);
 
         this->move_group_.setJointValueTarget({0.593, 0.913, -1.783, -2.789, 1.119, 2.098, -1.401+PI});
+        this->move_group_.move();
+    }
+
+    void transform_a2b()
+    {
+        this->move_group_.setJointValueTarget({-0.622, 0.312, -0.873, -1.930, 0.350, 2.141, 2.270-PI/2});
+        this->move_group_.move();
+
+        this->move_group_.setJointValueTarget({-1.088, 1.089, -0.732, -1.285, 0.239, 0.693, 0.325});
+        this->move_group_.move();
+
+        this->move_group_.setJointValueTarget({-1.095, 1.256, -0.704, -1.276, 0.292, 0.799, 0.323});
+        this->move_group_.move();
+
+        this->hand_action(true, LOGGER);
+
+        this->move_group_.setJointValueTarget({-1.088, 1.089, -0.732, -1.285, 0.239, 0.693, 0.325});
+        this->move_group_.move();
+
+        this->move_group_.setJointValueTarget({-0.894, -0.249, -0.730, -2.547, -0.214, 2.347, 0.939-PI/2});
+        this->move_group_.move();
+
+        this->move_group_.setJointValueTarget({-0.809, 0.226, -0.717, -2.589, 0.358, 2.752, 0.501-PI/2});
+        this->move_group_.move();
+
+        this->hand_action(false, LOGGER, 0.018);
+
+        this->move_group_.setJointValueTarget({-0.894, -0.249, -0.730, -2.547, -0.214, 2.347, 0.939-PI/2});
         this->move_group_.move();
     }
 

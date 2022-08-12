@@ -74,14 +74,14 @@ class ShapeDetector(MarkerDetector):
         # thresh = cv2.threshold(blur, 0, 255, cv2.THRESH_BINARY + cv2.THRESH_OTSU)[1]
 
         # Find contours
-        contours = cv2.findContours(gray, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)[0]
+        contours = cv2.findContours(thresh_inv, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)[0]
         # Find boxes
         box_position = []
         box_rot = []
         w_l = []
         for contour in contours:
             x, y, w, h = cv2.boundingRect(contour)
-            if w * h < 800 or w * h > 40000 or w < 60 or h < 60:
+            if w * h < 800 or w * h > 40000 or w < 50 or h < 50:
                 continue
             elif y == 0:
                 continue
@@ -90,11 +90,12 @@ class ShapeDetector(MarkerDetector):
             box = cv2.boxPoints(rect)
             box_int = np.int0(box)
 
-            length = [box[1, :]-box[0, :], box[2, :]-box[1, :]]
+            length_vec = [box[1, :]-box[0, :], box[2, :]-box[1, :]]
             # vect = [box[1, :]-box[0, :], box[2, :]-box[1, :], box[3, :]-box[2, :], box[0, :]-box[3, :]]
-            length_norm = np.linalg.norm(length, axis=1)
-            w_l.append(np.sort(length_norm).tolist())
-            vec = length[np.argmax(length_norm)]
+            length = np.linalg.norm(length_vec, axis=1)
+            length_sorted = np.sort(length)
+            w_l.append(length_sorted.tolist())
+            vec = length_vec[np.argmax(length)]
             # cv2.arrowedLine(self.image, np.int0(rect[0]), np.int0((box[0] + box[1]) / 2), (255, 255, 255), 1)
             # cv2.arrowedLine(self.image, np.int0(rect[0]), np.int0((box[0] + box[3]) / 2), (255, 255, 255), 1)
 
@@ -107,7 +108,8 @@ class ShapeDetector(MarkerDetector):
 
             # using drawContours() function
             cv2.drawContours(self.img2show, [box_int], 0, (0, 0, 255), 2)
-            # cv2.putText(self.image,'Pos A', (min(x_ls),min(y_ls)), cv2.FONT_HERSHEY_PLAIN, 3, (255,0,255), 3)
+            cv2.putText(self.img2show, 'ratio:%.2f' % (length_sorted[1]/length_sorted[0]),
+                        (x-50, y), cv2.FONT_HERSHEY_PLAIN, 3, (255, 0, 255), 3)
         self.box_trans = box_position
         self.box_rot = box_rot
         self.w_l = w_l
