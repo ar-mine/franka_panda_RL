@@ -88,7 +88,7 @@ bool Am::MoveitBase::moveit_move_ready(const rclcpp::Logger& LOGGER)
     return success;
 }
 
-void Am::MoveitBase::hand_action(bool open_close, const rclcpp::Logger& LOGGER, double target_width)
+void Am::MoveitBase::hand_action(bool open_close, const rclcpp::Logger& LOGGER, double target_width, double inner, double outer)
 {
 
 //        this->timer_->cancel();
@@ -105,10 +105,10 @@ void Am::MoveitBase::hand_action(bool open_close, const rclcpp::Logger& LOGGER, 
         goal_msg.width = target_width;
     goal_msg.speed = 0.04;
     goal_msg.force = 50;
-    goal_msg.epsilon.inner = 0.01;
-    goal_msg.epsilon.outer = 0.01;
+    goal_msg.epsilon.inner = inner;
+    goal_msg.epsilon.outer = outer;
 
-    RCLCPP_INFO(LOGGER, "Sending hand action goal");
+    RCLCPP_INFO(LOGGER, "Sending hand action goal with width:%.2f", goal_msg.width);
 
     auto send_goal_options = rclcpp_action::Client<franka_msgs::action::Grasp>::SendGoalOptions();
 //        send_goal_options.goal_response_callback =

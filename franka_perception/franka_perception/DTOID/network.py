@@ -452,7 +452,6 @@ class Network(NetworkBase):
 
     def forward_all_templates(self, image, template_features, template_features_global, topk=1):
         with torch.no_grad():
-
             class_outputs = []
             reg_outputs = []
 

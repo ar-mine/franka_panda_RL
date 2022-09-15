@@ -7,9 +7,9 @@ import numpy as np
 import pandas
 import numpy
 import cv2
-from math import atan2
+from math import atan2, atan
 
-from .siamesenet import SiameseNetwork
+from siamesenet import SiameseNetwork
 from torchvision import transforms
 import torch.nn.functional as F
 
@@ -109,11 +109,21 @@ class DTOIDModule:
 
             iteration += 1
 
-    def process(self, img_):
-        img_numpy = img_.copy()
-        img_h, img_w, img_c = img_numpy.shape
+    def process(self, rgb_img: np.ndarray, threshold: float = 0.7) -> (bool, np.ndarray, tuple, float):
+        """
+        Detect target instance object from @rgb_img while filtering whose scores are under @threshold.
+        :param rgb_img: omit
+        :param threshold: omit
+        :return: successful flag(whether detecting object with scores higher than @threshold)
+                 @rgb_image with overlay bounding boxes
+                 coordinates of bounding box(so far without rotation)
+                 angle of the rotation
+        """
+        # Copy input to avoid disturb public var.
+        img_copy = rgb_img.copy()
+        img_h, img_w, img_c = img_copy.shape
 
-        img_tensor = Image.fromarray(img_numpy[:, :, ::-1])
+        img_tensor = Image.fromarray(img_copy[:, :, ::-1])
         img_tensor = self.preprocess[0](img_tensor)
 
         network_h = img_tensor.size(1)
@@ -165,7 +175,7 @@ class DTOIDModule:
             y1 = int(y1 / network_h * img_h)
             y2 = int(y2 / network_h * img_h)
 
-            bbox_img = img_numpy[y1:y2, x1:x2, :]
+            bbox_img = img_copy[y1:y2, x1:x2, :]
             # bbox_img=np.moveaxis(bbox_img,-1,0)
             # cv2.imwrite('./prediction/%s_%02d.jpg'%(data['img_path'].split('/')[-1].split('.')[0],p),bbox_img)
 
@@ -209,7 +219,11 @@ class DTOIDModule:
             pred_z = pred_z[:1]
         # print("pred_scores_np: %f" % pred_scores_np)
         # Show prediction
-        if len(pred_bbox_np) > 0 and pred_scores_np >= 0.7:
+        success = False
+        bbox = (0, 0, 0, 0)
+        angel = 0
+
+        if len(pred_bbox_np) > 0 and pred_scores_np >= threshold:
             x1, y1, x2, y2 = pred_bbox_np[0]
             temp_score = pred_scores_np[0]
 
@@ -219,7 +233,7 @@ class DTOIDModule:
             y2 = int(y2 / network_h * img_h)
 
             rec_color = (0, 255, 255)
-            cv2.rectangle(img_numpy,
+            cv2.rectangle(img_copy,
                           (x1, y1),
                           (x2, y2),
                           rec_color, 3)
@@ -273,23 +287,20 @@ class DTOIDModule:
             box[:, 1] = box[:, 1] + y1
 
             # using drawContours() function
-            cv2.drawContours(img_numpy, [box], 0, (0, 0, 255), 2)
+            cv2.drawContours(img_copy, [box], 0, (0, 0, 255), 2)
 
-            vect = [box[1, :]-box[0, :], box[2, :]-box[1, :], box[3, :]-box[2, :], box[0, :]-box[3, :]]
+            vect = [box[1, :] - box[0, :], box[2, :] - box[1, :], box[3, :] - box[2, :], box[0, :] - box[3, :]]
             vect_norm = np.linalg.norm(vect, axis=1)
             vec = vect[np.argmax(vect_norm)]
-            rot_z = atan2(vec[1], vec[0])
+            rot_z = atan(vec[1] / vec[0]) - np.pi
             #################################
 
             success = True
             bbox = (x1, y1, x2, y2)
             # bbox = (int(rect[0][0]), int(rect[0][1]), int(rect[1][0]), int(rect[1][1]))
             angel = rot_z
-        else:
-            success = False
-            bbox = (0, 0, 0, 0)
-            angel = 0
-        return success, img_numpy, bbox, angel
+
+        return success, img_copy, bbox, angel
 
 
 def sigmoid(x):
@@ -298,11 +309,12 @@ def sigmoid(x):
 
 
 if __name__ == "__main__":
-    node = DTOIDModule(template_dir="duck/output")
-    path = "./duck_video"
-    img_list = os.listdir(path)
+    image_path = "/home/armine/Pictures/YCB-like template dataset/scenarios/clutter env/sequence"
+    template_path = "/home/armine/Pictures/YCB-like template dataset/templates/car/output"
+    runner = DTOIDModule(template_dir=template_path)
+    img_list = os.listdir(image_path)
     for img_name in img_list:
-        img = cv2.imread(os.path.join(path, img_name))
-        success, img_numpy, bbox, angel = node.process(img)
+        img = cv2.imread(os.path.join(image_path, img_name))
+        success, img_numpy, bbox, angel = runner.process(img)
         cv2.imshow("show", img_numpy)
         cv2.waitKey(1)

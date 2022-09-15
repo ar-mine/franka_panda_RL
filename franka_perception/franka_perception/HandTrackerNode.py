@@ -10,8 +10,8 @@ from std_msgs.msg import Float32MultiArray
 from sensor_msgs.msg import Image
 from geometry_msgs.msg import TransformStamped
 
-from src.franka_panda_RL.franka_perception.franka_perception.base.ImageNodeBase import ImageNodeBase
-from HandTrackingModule import HandDetector, post_process
+from franka_perception.base.ImageNodeBase import ImageNodeBase
+from franka_perception.utils.HandTrackingModule import HandDetector, post_process
 
 camera_k = np.array([[604.207275390625, 0.0, 317.8360290527344],
                      [0.0, 603.8510131835938, 234.7834014892578],

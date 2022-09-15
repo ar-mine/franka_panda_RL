@@ -1,10 +1,3 @@
-## License: Apache 2.0. See LICENSE file in root directory.
-## Copyright(c) 2015-2017 Intel Corporation. All Rights Reserved.
-
-###############################################
-##      Open CV and Numpy integration        ##
-###############################################
-
 import pyrealsense2 as rs
 import numpy as np
 import cv2
@@ -39,10 +32,10 @@ else:
 pipeline.start(config)
 
 path_idx = 101
-if not os.path.exists("./record/%05d"%path_idx):
-    os.mkdir("./record/%05d"%path_idx)
+if not os.path.exists("./record/%05d" % path_idx):
+    os.mkdir("./record/%05d" % path_idx)
 img_idx = 0
-img_itr =0
+img_itr = 0
 try:
     while True:
 
@@ -70,14 +63,14 @@ try:
         # else:
         #     images = np.hstack((color_image, depth_colormap))
 
-        if img_itr<21:
-            img_itr+=1
+        if img_itr < 21:
+            img_itr += 1
             continue
 
         # Show images
         cv2.namedWindow('RealSense', cv2.WINDOW_AUTOSIZE)
         cv2.imshow('RealSense', color_image)
-        cv2.imwrite("./record/%05d"%path_idx+"/%05d.jpg"%img_idx, color_image)
+        cv2.imwrite("./record/%05d" % path_idx + "/%05d.jpg" % img_idx, color_image)
         cv2.waitKey(1)
 
         img_idx += 1

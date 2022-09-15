@@ -20,7 +20,7 @@ setup(
     tests_require=['pytest'],
     entry_points={
         'console_scripts': [
-            'image_seg_sever = franka_perception.imageSeg_sever:main'
+            'instance_detector = franka_perception.ObjDetectorNode:main'
         ],
     },
 )

@@ -20,6 +20,9 @@ namespace Am {
 
     void quaternion_to_orientation(tf2::Quaternion& quaternion_, geometry_msgs::msg::Pose& pose_);
 
+    bool transform_multi_get(std::shared_ptr<tf2_ros::Buffer>& tf_buffer, const rclcpp::Logger& logger,
+                       const std::string& toFrameRel, const std::string& fromFrameRel, geometry_msgs::msg::Pose& pose, int times);
+
     bool transform_get(std::shared_ptr<tf2_ros::Buffer>& tf_buffer, const rclcpp::Logger& logger,
                        const std::string& toFrameRel, const std::string& fromFrameRel, geometry_msgs::msg::Pose& pose);
 

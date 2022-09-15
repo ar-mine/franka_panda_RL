@@ -6,9 +6,12 @@ from geometry_msgs.msg import TransformStamped
 from cv_bridge import CvBridge, CvBridgeError
 from tf2_ros import TransformBroadcaster
 
-from DTOID.DTOIDModule import DTOIDModule
-from src.franka_panda_RL.franka_perception.franka_perception.base.ImageNodeBase import ImageNodeBase
-from utils.BoxDetector import BoxDetector
+from franka_perception.DTOID.DTOIDModule import DTOIDModule
+from franka_perception.base.ImageNodeBase import ImageNodeBase
+from franka_perception.utils.BoxDetector import BoxDetector
+
+import time
+import cv2
 
 
 class ObjDetectorNode(ImageNodeBase):
@@ -19,7 +22,7 @@ class ObjDetectorNode(ImageNodeBase):
                   1 for detecting with object detection
                   2 for detecting box's lattice
         """
-        self.step = 1
+        self.step = 0
 
         self.rgb_img = None
         self.depth_img = None
@@ -38,6 +41,8 @@ class ObjDetectorNode(ImageNodeBase):
 
     def timer_callback(self):
         if self.rgb_img is not None and self.depth_img is not None:
+            start_time = time.time()
+
             img = self.rgb_img
 
             flag = Int32()
@@ -45,13 +50,13 @@ class ObjDetectorNode(ImageNodeBase):
             angel = 0
             x_y_z = np.zeros((3,))
             if self.step == 1:
-            # if True:
-                success, img, bbox, angel = self.detector_model.process(self.rgb_img)
+                success, img, bbox, angel = self.detector_model.process(self.rgb_img, threshold=0.75)
                 if success:
                     depth_array = self.depth_img[bbox[1]:bbox[3], bbox[0]:bbox[2]]
-                    avg_depth = np.average(depth_array)/1000.0
+                    # avg_depth = np.average(depth_array)/1000.0
+                    avg_depth = 0.52
 
-                    bbox_center = [(bbox[0]+bbox[2])//2, (bbox[1]+bbox[3])//2]
+                    bbox_center = [(bbox[0] + bbox[2]) // 2, (bbox[1] + bbox[3]) // 2]
                     u_v_1 = np.array([bbox_center[0], bbox_center[1], 1]).T
                     x_y_z = np.matmul(np.linalg.inv(self.camera_k), u_v_1) * avg_depth
                     # self.tf_handler(x_y_z, angel=angel)
@@ -62,19 +67,20 @@ class ObjDetectorNode(ImageNodeBase):
 
             x_y_z_list = [np.zeros((3,)), np.zeros((3,)), np.zeros((3,)), np.zeros((3,))]
             if self.step == 2:
-            # if True:
                 img, bbox_list = self.box_detector.process(self.rgb_img)
                 if len(bbox_list) == 4:
                     for i, bbox in enumerate(bbox_list):
                         depth_array = self.depth_img[bbox[1]:bbox[3], bbox[0]:bbox[2]]
-                        avg_depth = np.average(depth_array)/1000.0
+                        avg_depth = np.average(depth_array) / 1000.0
 
-                        bbox_center = [(bbox[0]+bbox[2])//2, (bbox[1]+bbox[3])//2]
+                        bbox_center = [(bbox[0] + bbox[2]) // 2, (bbox[1] + bbox[3]) // 2]
                         u_v_1 = np.array([bbox_center[0], bbox_center[1], 1]).T
                         x_y_z_list[i] = np.matmul(np.linalg.inv(self.camera_k), u_v_1) * avg_depth
             for i, bbox in enumerate(x_y_z_list):
-                self.tf_handler(x_y_z_list[i], child_frame="lattice_"+str(i), angel=180)
+                self.tf_handler(x_y_z_list[i], child_frame="lattice_" + str(i), angel=180)
 
+            cv2.putText(img, 'FPS:%.2f' % (1/(time.time() - start_time)), (0, 30), cv2.FONT_HERSHEY_SIMPLEX, fontScale=1,
+                        color=(0, 0, 255), thickness=1)
             img = self.bridge.cv2_to_imgmsg(img, "bgr8")
             self.image_publisher.publish(img)
 
@@ -99,7 +105,7 @@ class ObjDetectorNode(ImageNodeBase):
         t.transform.rotation.z = q[2]
         t.transform.rotation.w = q[3]
 
-    # Send the transformation
+        # Send the transformation
         self.tf_broadcaster.sendTransform(t)
 
     def step_callback(self, msg):
@@ -118,10 +124,10 @@ def get_quaternion_from_euler(roll, pitch, yaw):
     Output
       :return qx, qy, qz, qw: The orientation in quaternion [x,y,z,w] format
     """
-    qx = np.sin(roll/2) * np.cos(pitch/2) * np.cos(yaw/2) - np.cos(roll/2) * np.sin(pitch/2) * np.sin(yaw/2)
-    qy = np.cos(roll/2) * np.sin(pitch/2) * np.cos(yaw/2) + np.sin(roll/2) * np.cos(pitch/2) * np.sin(yaw/2)
-    qz = np.cos(roll/2) * np.cos(pitch/2) * np.sin(yaw/2) - np.sin(roll/2) * np.sin(pitch/2) * np.cos(yaw/2)
-    qw = np.cos(roll/2) * np.cos(pitch/2) * np.cos(yaw/2) + np.sin(roll/2) * np.sin(pitch/2) * np.sin(yaw/2)
+    qx = np.sin(roll / 2) * np.cos(pitch / 2) * np.cos(yaw / 2) - np.cos(roll / 2) * np.sin(pitch / 2) * np.sin(yaw / 2)
+    qy = np.cos(roll / 2) * np.sin(pitch / 2) * np.cos(yaw / 2) + np.sin(roll / 2) * np.cos(pitch / 2) * np.sin(yaw / 2)
+    qz = np.cos(roll / 2) * np.cos(pitch / 2) * np.sin(yaw / 2) - np.sin(roll / 2) * np.sin(pitch / 2) * np.cos(yaw / 2)
+    qw = np.cos(roll / 2) * np.cos(pitch / 2) * np.cos(yaw / 2) + np.sin(roll / 2) * np.sin(pitch / 2) * np.sin(yaw / 2)
 
     return [qx, qy, qz, qw]
 

@@ -42,6 +42,17 @@ void Am::quaternion_to_orientation(tf2::Quaternion& quaternion_, geometry_msgs::
     pose_.orientation.w = quaternion_.w();
 }
 
+bool Am::transform_multi_get(std::shared_ptr<tf2_ros::Buffer>& tf_buffer, const rclcpp::Logger& logger,
+                       const std::string& toFrameRel, const std::string& fromFrameRel, geometry_msgs::msg::Pose& pose, int times)
+{
+    for(int i=0; i<times; i++)
+    {
+        if(Am::transform_get(tf_buffer, logger, toFrameRel, fromFrameRel, pose))
+            return true;
+    }
+    return false;
+}
+
 bool Am::transform_get(std::shared_ptr<tf2_ros::Buffer>& tf_buffer, const rclcpp::Logger& logger,
                    const std::string& toFrameRel, const std::string& fromFrameRel, geometry_msgs::msg::Pose& pose)
 {

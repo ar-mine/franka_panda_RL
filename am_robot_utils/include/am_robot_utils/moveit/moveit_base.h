@@ -42,7 +42,7 @@ namespace Am {
         /*********************** Control mode 2(function)  ********************************/
         bool moveit_move_ready(const rclcpp::Logger &LOGGER);
 
-        void hand_action(bool open_close, const rclcpp::Logger &LOGGER, double target_width=0.0);
+        void hand_action(bool open_close, const rclcpp::Logger &LOGGER, double target_width=0.0, double inner=0.01, double outer=0.01);
 
 
     private:
