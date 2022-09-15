@@ -1,0 +1,8 @@
+<library path="am_franka_controllers">
+    <class name="am_franka_controllers/PositionServoController"
+           type="am_franka_controllers::PositionServoController" base_class_type="controller_interface::ControllerInterface">
+        <description>
+            The position based servo controller
+        </description>
+    </class>
+</library>
