@@ -19,6 +19,8 @@ find_package(rclcpp_lifecycle REQUIRED)
 find_package(hardware_interface REQUIRED)
 find_package(franka_msgs REQUIRED)
 find_package(Eigen3 REQUIRED)
+find_package(Boost REQUIRED)
+find_package(kdl_parser REQUIRED)
 
 add_library(
         ${PROJECT_NAME}
@@ -29,6 +31,7 @@ target_include_directories(
         PUBLIC
         include
         ${EIGEN3_INCLUDE_DIRS}
+        ${Boost_INCLUDE_DIRS}
 )
 ament_target_dependencies(
         ${PROJECT_NAME}
@@ -54,7 +57,10 @@ install(
         DIRECTORY include/
         DESTINATION include
 )
-
+install(
+        DIRECTORY config launch
+        DESTINATION share/${PROJECT_NAME}
+)
 if(BUILD_TESTING)
   find_package(ament_lint_auto REQUIRED)
   # the following line skips the linter which checks for copyrights

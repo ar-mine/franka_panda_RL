@@ -1,0 +1,9 @@
+controller_manager:
+  ros__parameters:
+    update_rate: 1000  # Hz
+
+    position_servo_controller:
+      type: am_franka_controllers/PositionServoController
+
+    joint_state_broadcaster:
+      type: joint_state_broadcaster/JointStateBroadcaster

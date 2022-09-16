@@ -1,7 +1,6 @@
 //
 // Created by armine on 9/15/22.
 //
-
 #include "am_franka_controllers/position_servo.h"
 
 namespace am_franka_controllers{
@@ -47,6 +46,15 @@ namespace am_franka_controllers{
     PositionServoController::on_configure(const rclcpp_lifecycle::State& previous_state)
     {
         // Parameters are usually read here, and everything is prepared so that the controller can be started.
+        std::string robot_desc_string;
+        robot_desc_string = node_->get_parameter("robot_description").as_string();
+        if (!kdl_parser::treeFromString(robot_desc_string, robot_tree)){
+            fprintf(stderr, "Failed to construct kdl tree\n");
+            return CallbackReturn::FAILURE;
+        }
+
+        robot_tree.getChain("panda_link0", "panda_hand_tcp", robot_chain);
+
         arm_id_ = node_->get_parameter("arm_id").as_string();
         return CallbackReturn::SUCCESS;
     }
