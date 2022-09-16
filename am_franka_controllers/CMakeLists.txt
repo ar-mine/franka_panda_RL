@@ -20,6 +20,7 @@ find_package(hardware_interface REQUIRED)
 find_package(franka_msgs REQUIRED)
 find_package(Eigen3 REQUIRED)
 find_package(Boost REQUIRED)
+find_package(urdf REQUIRED)
 find_package(kdl_parser REQUIRED)
 
 add_library(
@@ -40,6 +41,8 @@ ament_target_dependencies(
         pluginlib
         rclcpp
         rclcpp_lifecycle
+        urdf
+        kdl_parser
 )
 
 pluginlib_export_plugin_description_file(
