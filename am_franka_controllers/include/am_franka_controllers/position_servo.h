@@ -13,11 +13,13 @@
 #include <kdl/chain.hpp>
 #include <kdl/chainfksolver.hpp>
 #include <kdl/chainfksolverpos_recursive.hpp>
+#include <kdl/chainjnttojacsolver.hpp>
 #include <kdl/frames_io.hpp>
 
 #include <controller_interface/controller_interface.hpp>
 #include <rclcpp/duration.hpp>
 #include <rclcpp/time.hpp>
+#include "std_msgs/msg/float32_multi_array.hpp"
 
 namespace am_franka_controllers{
 
@@ -36,8 +38,11 @@ namespace am_franka_controllers{
         controller_interface::return_type update() override;
         void updateJointStates();
         void updateFKStates();
+        void XyzCallback(const std_msgs::msg::Float32MultiArray::ConstSharedPtr msg);
 
-        private:
+        rclcpp::Subscription<std_msgs::msg::Float32MultiArray>::SharedPtr relative_xyz_sub_;
+
+    private:
         std::string arm_id_;
         const int num_joints = 7;
         Vector7d q_;
@@ -47,11 +52,22 @@ namespace am_franka_controllers{
         Vector7d eef_;
         Vector3d eef_t_;
         Vector4d eef_r_;
+        Vector7d k_gains_;
+        Vector7d d_gains_;
 
-        KDL::Tree robot_tree_;
+        KDL::Frame current_pose_;
+        KDL::Frame reference_pose_;
         KDL::Chain robot_chain_;
         KDL::JntArray jnt_pos_, jnt_effort_;
+        KDL::Jacobian jacobian_;
+        KDL::Twist error_;
         boost::scoped_ptr<KDL::ChainFkSolverPos> jnt_to_pose_solver_;
+        boost::scoped_ptr<KDL::ChainJntToJacSolver> jnt_to_jac_solver_;
+
+        double factor_ = 0.05;
+        Vector7d dq_max_ = (Vector7d() << 2.62, 2.62, 2.62, 2.62, 5.26, 4.18, 5.26).finished();  // in m/s
+        Vector7d ddq_max_start_ = (Vector7d() << 10, 10, 10, 10, 10, 10, 10).finished();         // in m/s^2
+        Vector7d tau_max_ = (Vector7d() << 87, 87, 87, 87, 12, 12, 12).finished();          // in Nm
     };
 
 }

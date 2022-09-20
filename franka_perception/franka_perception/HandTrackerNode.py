@@ -84,7 +84,7 @@ class HandTrackerNode(ImageNodeBase):
                 float_array = Float32MultiArray()
                 float_array.data = x_y_z.tolist()+ux_uy.tolist()
                 self.array_publisher.publish(float_array)
-                self.tf_handler(x_y_z)
+                # self.tf_handler(x_y_z)
                 # Ensure the depth is credible
                 # if hand_depth >= 0.30:
                 #     u_v_1 = np.array([bbox_center[0], bbox_center[1], 1]).T
