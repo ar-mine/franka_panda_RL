@@ -9,7 +9,7 @@ import numpy
 import cv2
 from math import atan2, atan
 
-from siamesenet import SiameseNetwork
+from .siamesenet import SiameseNetwork
 from torchvision import transforms
 import torch.nn.functional as F
 

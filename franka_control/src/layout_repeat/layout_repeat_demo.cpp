@@ -140,7 +140,7 @@ public:
 
     void run()
     {
-        this->hand_action(true, LOGGER);
+        this->hand_action(LOGGER, 0.03, 0.04, 30, 0.02, 0.02);
         move_predefined(this->move_group_, "waiting");
 
         while(!this->get_parameter("next").get_parameter_value().get<bool>())
@@ -210,7 +210,7 @@ public:
                 this->move_group_.setPoseTarget(abs_trans_cam, "panda_hand_tcp");
                 this->move_group_.move();
 
-                this->hand_action(true, LOGGER);
+                this->hand_action(LOGGER, 0.03, 0.04, 30, 0.02, 0.02);
 
                 abs_trans_cam.position.z = 0.15;
                 this->move_group_.setPoseTarget(abs_trans_cam, "panda_hand_tcp");
@@ -232,7 +232,7 @@ public:
         this->move_group_.setJointValueTarget({0.350, 1.149, -1.035, -2.364, -0.099, 1.853, -0.117+PI});
         this->move_group_.move();
 
-        this->hand_action(true, LOGGER);
+        this->hand_action(LOGGER, 0.03, 0.04, 30, 0.02, 0.02);
 
         this->move_group_.setJointValueTarget({0.600, 1.290, -1.548, -2.440, -0.233, 1.748, 2.642});
         this->move_group_.move();
@@ -240,7 +240,7 @@ public:
         this->move_group_.setJointValueTarget({0.835, 0.158, -2.060, -2.888, 0.486, 2.789, -0.854+PI});
         this->move_group_.move();
 
-        this->hand_action(false, LOGGER, 0.019);
+        this->hand_action(LOGGER, 0.03, 0.04, 30, 0.02, 0.02);
 
         this->move_group_.setJointValueTarget({0.593, 0.913, -1.783, -2.789, 1.119, 2.098, -1.401+PI});
         this->move_group_.move();
@@ -257,7 +257,7 @@ public:
         this->move_group_.setJointValueTarget({-1.095, 1.256, -0.704, -1.276, 0.292, 0.799, 0.323});
         this->move_group_.move();
 
-        this->hand_action(true, LOGGER);
+        this->hand_action(LOGGER, 0.03, 0.04, 30, 0.02, 0.02);
 
         this->move_group_.setJointValueTarget({-1.088, 1.089, -0.732, -1.285, 0.239, 0.693, 0.325});
         this->move_group_.move();
@@ -268,7 +268,7 @@ public:
         this->move_group_.setJointValueTarget({-0.809, 0.226, -0.717, -2.589, 0.358, 2.752, 0.501-PI/2});
         this->move_group_.move();
 
-        this->hand_action(false, LOGGER, 0.018);
+        this->hand_action(LOGGER, 0.03, 0.04, 30, 0.02, 0.02);
 
         this->move_group_.setJointValueTarget({-0.894, -0.249, -0.730, -2.547, -0.214, 2.347, 0.939-PI/2});
         this->move_group_.move();
@@ -303,7 +303,7 @@ public:
             {
 
             }
-            this->hand_action(false, LOGGER, 0.019);
+            this->hand_action(LOGGER, 0.03, 0.04, 30, 0.02, 0.02);
         }
         else if(face == 2)
         {
@@ -332,7 +332,7 @@ public:
             {
 
             }
-            this->hand_action(false, LOGGER, 0.042);
+            this->hand_action(LOGGER, 0.03, 0.04, 30, 0.02, 0.02);
         }
     }
 
@@ -368,5 +368,3 @@ int main(int argc, char **argv) {
     rclcpp::shutdown();
     return 0;
 }
-// position: -0.052150, 0.033516, 0.414817, orientation: 0.000000, 0.000000, 0.100394, -0.994948
-// position: -0.050712, 0.032148, 0.415049, orientation: 0.000000, 0.000000, -0.089806, 0.995959

@@ -52,6 +52,9 @@ namespace Am {
 
         rclcpp_action::Client<franka_msgs::action::Grasp>::SharedPtr grasp_client_ptr_;
         bool finish_flag = false;
+
+        bool hand_action(const rclcpp::Logger &LOGGER, double width, double speed, double force, double epsilon_inner,
+                         double epsilon_outer);
     };
 }
 #endif //BUILD_MOVEIT_BASE_H

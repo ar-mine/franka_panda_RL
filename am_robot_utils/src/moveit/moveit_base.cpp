@@ -88,25 +88,26 @@ bool Am::MoveitBase::moveit_move_ready(const rclcpp::Logger& LOGGER)
     return success;
 }
 
-void Am::MoveitBase::hand_action(bool open_close, const rclcpp::Logger& LOGGER, double target_width, double inner, double outer)
+bool Am::MoveitBase::hand_action(const rclcpp::Logger &LOGGER,
+                                 double width,
+                                 double speed,
+                                 double force,
+                                 double epsilon_inner,
+                                 double epsilon_outer)
 {
 
 //        this->timer_->cancel();
 
     if (!this->grasp_client_ptr_->wait_for_action_server()) {
         RCLCPP_ERROR(LOGGER, "Action server not available after waiting");
-        rclcpp::shutdown();
+        return false;
     }
-
     auto goal_msg = franka_msgs::action::Grasp::Goal();
-    if(open_close)
-        goal_msg.width = 0.18;
-    else
-        goal_msg.width = target_width;
-    goal_msg.speed = 0.04;
-    goal_msg.force = 50;
-    goal_msg.epsilon.inner = inner;
-    goal_msg.epsilon.outer = outer;
+    goal_msg.width = width;
+    goal_msg.speed = speed;
+    goal_msg.force = force;
+    goal_msg.epsilon.inner = epsilon_inner;
+    goal_msg.epsilon.outer = epsilon_outer;
 
     RCLCPP_INFO(LOGGER, "Sending hand action goal with width:%.2f", goal_msg.width);
 
@@ -125,6 +126,8 @@ void Am::MoveitBase::hand_action(bool open_close, const rclcpp::Logger& LOGGER, 
         rclcpp::sleep_for(std::chrono::milliseconds (100));
     }
     this->finish_flag = false;
+
+    return true;
 }
 
 using GoalHandleGrasp = rclcpp_action::ClientGoalHandle<franka_msgs::action::Grasp>;

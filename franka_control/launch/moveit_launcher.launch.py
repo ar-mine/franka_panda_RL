@@ -70,15 +70,8 @@ def generate_launch_description():
         parameters=[robot_description,
                     robot_description_semantic,
                     kinematics_yaml,
-                    config_yaml]
-    )
-    tf2_node = Node(
-        name="camera_link_broadcaster",
-        package="tf2_ros",
-        executable="static_transform_publisher",
-        arguments=["0.0513706", "-0.015675", "0.0331922",
-                   "0.699842", "0.0103786", "0.714221", "-0.00154157",
-                   "panda_hand", "camera_link"]
+                    config_yaml],
+        # prefix=['xterm -e gdb -ex run --args']
     )
 
-    return LaunchDescription([tf2_node, move_group])
+    return LaunchDescription([move_group])
