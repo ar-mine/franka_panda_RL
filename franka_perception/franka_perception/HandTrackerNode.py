@@ -13,8 +13,8 @@ from geometry_msgs.msg import TransformStamped
 from franka_perception.base.ImageNodeBase import ImageNodeBase
 from franka_perception.utils.HandTrackingModule import HandDetector, post_process
 
-camera_k = np.array([[604.207275390625, 0.0, 317.8360290527344],
-                     [0.0, 603.8510131835938, 234.7834014892578],
+camera_k = np.array([[906.3109741210938, 0.0, 636.7540283203125],
+                     [0.0, 905.7764892578125, 352.17510986328125],
                      [0.0, 0.0, 1.0]])
 
 
@@ -34,7 +34,7 @@ class HandTrackerNode(ImageNodeBase):
         self.tf_broadcaster = TransformBroadcaster(self)
 
         self.rect_size = 3
-        self.img_size = (640, 480)
+        self.img_size = (1280, 640)
 
     def rgb_callback(self, rgb_msg):
         try:
@@ -67,7 +67,6 @@ class HandTrackerNode(ImageNodeBase):
 
             if len(bbox) == 4:
                 bbox_center = [(bbox[0]+bbox[1])//2, (bbox[2]+bbox[3])//2]
-
                 # Calculate the hand average depth
                 bound_x_min = bbox_center[0]-self.rect_size if bbox_center[0] >= self.rect_size else 0
                 bound_x_max = bbox_center[0]+self.rect_size \
@@ -76,8 +75,11 @@ class HandTrackerNode(ImageNodeBase):
                 bound_y_max = bbox_center[1]+self.rect_size \
                     if bbox_center[1] <= self.img_size[1]-self.rect_size else self.img_size[1]
                 hand_depth = np.average(depth_img_[bound_y_min:bound_y_max, bound_x_min:bound_x_max])/1000.0
-
+                if np.isnan(hand_depth):
+                    print("Nan")
+                    return
                 u_v_1 = np.array([bbox_center[0], bbox_center[1], 1]).T
+                # u_v_1_cali = np.array([bbox_center[0]-self.img_size[0]/2, bbox_center[1]-self.img_size[1]/2, 1]).T
                 ux_uy = np.matmul(np.linalg.inv(camera_k), u_v_1)
                 x_y_z = hand_depth * ux_uy
                 # print("%.2f, %.2f, %.2f" % (x_y_z[0], x_y_z[1], x_y_z[2]))

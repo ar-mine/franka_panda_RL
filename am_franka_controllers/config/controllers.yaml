@@ -27,3 +27,49 @@ position_servo_controller:
       - 1.0
       - 1.0
       - 0.5
+
+position_controller_node:
+  ros__parameters:
+    arm_id: panda
+    k_gains:
+      - 10.0
+      - 10.0
+      - 10.0
+      - 20.0
+      - 50.0
+      - 90.0
+      - 100.0
+    d_gains:
+      - 2.0
+      - 2.0
+      - 2.0
+      - 1.0
+      - 1.0
+      - 1.0
+      - 0.5
+    effort_compensation:
+      - 0.1
+      - 0.1
+      - 0.1
+      - 0.1
+      - 0.7
+      - 0.6
+      - 0.45
+
+osc_controller_node:
+  ros__parameters:
+    arm_id: panda
+    k_gains:
+      - 100.0
+      - 100.0
+      - 100.0
+      - 100.0
+      - 100.0
+      - 100.0
+    d_gains:
+      - 20.0
+      - 20.0
+      - 20.0
+      - 20.0
+      - 20.0
+      - 20.0

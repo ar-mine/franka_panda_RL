@@ -50,7 +50,7 @@ class ObjDetectorNode(ImageNodeBase):
             angel = 0
             x_y_z = np.zeros((3,))
             if self.step == 1:
-                success, img, bbox, angel = self.detector_model.process(self.rgb_img, threshold=0.75)
+                success, img, bbox, angel = self.detector_model.process(self.rgb_img, threshold=0.7)
                 if success:
                     depth_array = self.depth_img[bbox[1]:bbox[3], bbox[0]:bbox[2]]
                     # avg_depth = np.average(depth_array)/1000.0

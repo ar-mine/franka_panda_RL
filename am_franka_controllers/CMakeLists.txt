@@ -13,20 +13,27 @@ endif()
 # find dependencies
 find_package(ament_cmake REQUIRED)
 find_package(rclcpp REQUIRED)
-find_package(controller_interface REQUIRED)
+find_package(rclcpp_action REQUIRED)
 find_package(pluginlib REQUIRED)
 find_package(rclcpp_lifecycle REQUIRED)
 find_package(hardware_interface REQUIRED)
-find_package(franka_msgs REQUIRED)
 find_package(Eigen3 REQUIRED)
 find_package(Boost REQUIRED)
 find_package(urdf REQUIRED)
 find_package(kdl_parser REQUIRED)
+find_package(Franka REQUIRED)
+find_package(franka_msgs REQUIRED)
+find_package(geometry_msgs REQUIRED)
+find_package(franka_interface REQUIRED)
 
+############### Library #################
 add_library(
         ${PROJECT_NAME}
         SHARED
-        src/realtime_servo/position_servo.cpp)
+        src/controller_base.cpp
+        src/cartesian_impedance_controller.cpp
+        src/cartesian_position_controller.cpp
+)
 target_include_directories(
         ${PROJECT_NAME}
         PUBLIC
@@ -36,18 +43,34 @@ target_include_directories(
 )
 ament_target_dependencies(
         ${PROJECT_NAME}
-        controller_interface
-        hardware_interface
-        pluginlib
         rclcpp
-        rclcpp_lifecycle
-        urdf
+        rclcpp_action
+        geometry_msgs
         kdl_parser
+        Franka
+        franka_interface
 )
 
-pluginlib_export_plugin_description_file(
-        controller_interface am_franka_controllers.xml)
+############### Executable #################
+add_executable(controller_runner src/controller_runner.cpp)
+target_include_directories(
+        controller_runner
+        PUBLIC
+        include
+        ${EIGEN3_INCLUDE_DIRS}
+        ${Boost_INCLUDE_DIRS}
+)
+ament_target_dependencies(
+        controller_runner
+)
+target_link_libraries(controller_runner
+        ${PROJECT_NAME})
+install(TARGETS
+        controller_runner
+        DESTINATION lib/${PROJECT_NAME}
+        )
 
+############### Misc #################
 install(
         TARGETS
         ${PROJECT_NAME}
@@ -55,7 +78,6 @@ install(
         ARCHIVE DESTINATION lib
         LIBRARY DESTINATION lib
 )
-
 install(
         DIRECTORY include/
         DESTINATION include

@@ -194,12 +194,11 @@ HandTracker::HandTracker(const std::string& node_name, const rclcpp::NodeOptions
     std::array<double, 7> q_goal = {{0, -M_PI_4, 0, -3 * M_PI_4, 0, M_PI_2, M_PI_4}};
     MotionGenerator motion_generator(0.5, q_goal);
     robot_.control(motion_generator);
-    gripper_.homing();
     RCLCPP_INFO(this->get_logger(), "Finished moving to initial joint configuration.");
 
     // Timer
-    timer_  = this->create_wall_timer(std::chrono::milliseconds(100),
-                                      std::bind(&HandTracker::TimerCallback, this));
+//    timer_  = this->create_wall_timer(std::chrono::milliseconds(100),
+//                                      std::bind(&HandTracker::TimerCallback, this));
     // Subscribe to target pose
     relative_xyz_sub_ = this->create_subscription<std_msgs::msg::Float32MultiArray>
             ("/hand_tracker/array", rclcpp::QoS(1), std::bind(&HandTracker::XyzCallback, this, std::placeholders::_1));
@@ -289,28 +288,33 @@ void HandTracker::run()
 
     std::queue<double> bias_vel_x;
     std::queue<double> bias_vel_y;
-    double queue_size_max = 5;
-    double i_factor = 0.4;
+    std::queue<double> bias_vel_z;
+    const double queue_size_max = 5;
+    const double i_factor = 0.2;
     for(size_t i=0; i < queue_size_max; i++)
     {
         bias_vel_x.emplace(0.0);
         bias_vel_y.emplace(0.0);
+        bias_vel_z.emplace(0.0);
     }
     double compensation_x = 0.0;
     double compensation_y = 0.0;
+    double compensation_z = 0.0;
 
     double time = 0.0;
-    double a_max = 2.5;
+    double a_max = 1.0;
     double j_max = 500;
-    double factor = 0.8;
+    double factor = 0.7;
 
-    robot_.control([=, &time, &current_vel, &current_acc, &bias_vel_x, &bias_vel_y, &compensation_x, &compensation_y]
+    robot_.control([=, &time, &current_vel, &current_acc,
+                    &bias_vel_x, &bias_vel_y, &bias_vel_z,
+                    &compensation_x, &compensation_y, &compensation_z]
     (const franka::RobotState& robot_state, franka::Duration period) -> franka::CartesianVelocities
     {
         double time_seg = period.toSec();
         time += time_seg;
 
-        current_t = {robot_state.O_T_EE_c.at(12), robot_state.O_T_EE_c.at(13), robot_state.O_T_EE_c.at(14)};
+        current_t = {robot_state.O_T_EE.at(12), robot_state.O_T_EE.at(13), robot_state.O_T_EE.at(14)};
         current_q = robot_state.q;
         current_vel = robot_state.O_dP_EE_c;
         current_acc = robot_state.O_ddP_EE_c;
@@ -318,26 +322,35 @@ void HandTracker::run()
         // Velocity
         double v_x = current_vel.at(0);
         double v_y = current_vel.at(1);
-        double v_goal_x = 0.0, v_goal_y = 0.0;
+        double v_z = current_vel.at(2);
+        double v_goal_x = 0.0, v_goal_y = 0.0, v_goal_z = 0.0;
         if(hand_array.flag > 0)
         {
             v_goal_x = -hand_array.y * factor + compensation_x/queue_size_max;
             v_goal_y = -hand_array.x * factor + compensation_y/queue_size_max;
+            v_goal_z = -(hand_array.z-0.2) * factor + compensation_z/queue_size_max;
         }
         compensation_x -= bias_vel_x.front();
         compensation_y -= bias_vel_y.front();
+        compensation_z -= bias_vel_z.front();
         bias_vel_x.pop();
         bias_vel_y.pop();
+        bias_vel_z.pop();
         bias_vel_x.emplace(v_goal_x*i_factor);
         bias_vel_y.emplace(v_goal_y*i_factor);
-        compensation_x += bias_vel_x.back();
-        compensation_y += bias_vel_y.back();
+        bias_vel_z.emplace(v_goal_z*i_factor);
+        compensation_x += v_goal_x*i_factor;
+        compensation_y += v_goal_y*i_factor;
+        compensation_z += v_goal_z*i_factor;
+//        RCLCPP_INFO(this->get_logger(), "The bias: %f, %f, %f", bias_vel_x.back(), bias_vel_y.back(), bias_vel_z.back());
+//        RCLCPP_INFO(this->get_logger(), "The goal vel: %f, %f, %f", v_goal_x, v_goal_y, v_goal_z);
 
         // Velocity refined for controller
         v_x = vel_refine(v_goal_x, v_x, current_acc.at(0), a_max, j_max, time_seg);
         v_y = vel_refine(v_goal_y, v_y, current_acc.at(1), a_max, j_max, time_seg);
-
-        franka::CartesianVelocities output = {{v_x, v_y, 0.0, 0.0, 0.0, 0.0}};
+        v_z = vel_refine(v_goal_z, v_z, current_acc.at(2), a_max, j_max, time_seg);
+        RCLCPP_INFO(this->get_logger(), "The input: %f, %f, %f", v_x, v_y, v_z);
+        franka::CartesianVelocities output = {{v_x, v_y, v_z, 0.0, 0.0, 0.0}};
 
         if (stop_flag) {
             std::cout << std::endl << "Finished motion, shutting down example" << std::endl;

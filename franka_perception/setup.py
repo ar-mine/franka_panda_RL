@@ -20,7 +20,8 @@ setup(
     tests_require=['pytest'],
     entry_points={
         'console_scripts': [
-            'instance_detector = franka_perception.ObjDetectorNode:main'
+            'instance_detector = franka_perception.ObjDetectorNode:main',
+            'box_detector = franka_perception.BoxDetectorNode:main'
         ],
     },
 )

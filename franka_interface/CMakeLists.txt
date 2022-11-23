@@ -1,5 +1,5 @@
 cmake_minimum_required(VERSION 3.5)
-project(franka_action_interface)
+project(franka_interface)
 
 # Default to C++14
 if(NOT CMAKE_CXX_STANDARD)
@@ -13,10 +13,12 @@ endif()
 # find dependencies
 find_package(ament_cmake REQUIRED)
 find_package(rosidl_default_generators REQUIRED)
+find_package(geometry_msgs REQUIRED)
 
 rosidl_generate_interfaces(${PROJECT_NAME}
-        "action/Reach.action"
-        "action/ImageSeg.action")
+        "action/CartPoseSet.action"
+        "srv/StackPick.srv"
+        DEPENDENCIES geometry_msgs)
 
 if(BUILD_TESTING)
   find_package(ament_lint_auto REQUIRED)

@@ -88,7 +88,7 @@ public:
                                          std::bind(&Runner::timer_callback, this));
 
         // Sleep to ensure system stable
-        rclcpp::sleep_for(std::chrono::seconds(2));
+        rclcpp::sleep_for(std::chrono::seconds(1));
         RCLCPP_INFO(this->get_logger(), "Node initialization successful.");
     }
 
@@ -98,7 +98,7 @@ public:
 
         // Set the mode 0 for detection module
         step_ = 0;
-        while(true)
+        for(int i = 0; i < 1; i++)
         {
             // Indicate whether the trajectory is executed fully
             bool full_loop = true;
@@ -126,8 +126,9 @@ public:
             }
 
             // Define freq and equal epsilon
-            static int freq = 50;
-            static double epsilon = 0.02;
+            const int freq = 50;
+            const int dt = 1000/freq;
+            const double epsilon = 0.02;
             // Indicate which point will be passed
             unsigned long path_idx = 0;
             std::array<double, 3> point_move_to = path_points[path_idx];
@@ -176,7 +177,7 @@ public:
                         }
                     }
                     // Sleep for detection frequency
-                    rclcpp::sleep_for(std::chrono::milliseconds(1000/freq));
+                    rclcpp::sleep_for(std::chrono::milliseconds(dt));
                 }
             }
 
@@ -209,58 +210,59 @@ public:
             const double jump_threshold = 0.0;
             const double eef_step = 0.01;
             double fraction = move_group_.computeCartesianPath(waypoints, eef_step, jump_threshold, trajectory);
-            move_group_.asyncExecute(trajectory);
+            move_group_.execute(trajectory);
             geometry_msgs::msg::PoseStamped current_pose;
             while(true)
             {
                 current_pose = move_group_.getCurrentPose();
-                if(std::abs(current_pose.pose.position.z - height)<0.004)
+                if(std::abs(current_pose.pose.position.z - height)<0.006)
                     break;
                 rclcpp::sleep_for(std::chrono::milliseconds(1000/freq));
             }
             rclcpp::sleep_for(std::chrono::seconds(1));
-//            // Start to try to grasp
-//            RCLCPP_INFO(logger_, "Move to target location 1");
-//            pose.position.z = 0.05;
-//            move_group_.setPoseTarget(pose, "panda_hand_tcp");
-//            bool success = (move_group_.plan(plan_temp) == moveit::planning_interface::MoveItErrorCode::SUCCESS);
-//            if(success) {
-//                RCLCPP_INFO(logger_, "Plan successfully");
-//                move_group_.execute(plan_temp);
-//            }
-//            else
-//                RCLCPP_INFO(logger_, "Plan fail");
-//            RCLCPP_INFO(logger_, "Plan to target location 2");
-//            pose.position.z = 0.008;
-//            move_group_.setPoseTarget(pose, "panda_hand_tcp");
-//            success = (move_group_.plan(plan_temp) == moveit::planning_interface::MoveItErrorCode::SUCCESS);
-//
-//            // If the target pose for robot can be reached
-//            if(success)
-//            {
-//                RCLCPP_INFO(logger_, "Plan successfully");
-//                move_group_.execute(plan_temp);
-                if(this->hand_action(logger_,0.03, 0.04, 30, 0.02, 0.02))
-                    RCLCPP_INFO(logger_, "Grasp successfully!");
-                else
-                    RCLCPP_INFO(logger_, "Grasp failed, try again!");
-                pose.position.z = 0.2;
-                move_group_.setPoseTarget(pose, "panda_hand_tcp");
-                move_group_.move();
 
-                // PLace object into box
-                move_group_.setJointValueTarget(place_pose);
-                move_group_.move();
+            if(this->hand_action(logger_,0.03, 0.04, 30, 0.02, 0.02))
+                RCLCPP_INFO(logger_, "Grasp successfully!");
+            else
+                RCLCPP_INFO(logger_, "Grasp failed, try again!");
+            waypoints.clear();
+            pose.position.z = 0.2;
+            waypoints.push_back(pose);
+            current_pose.pose.position.x = 0.0628;
+            current_pose.pose.position.y = 0.4156;
+            current_pose.pose.position.z = 0.4854;
+            current_pose.pose.orientation.x = 1.0;
+            waypoints.push_back(current_pose.pose);
+            current_pose.pose.position.z = 0.25;
+            waypoints.push_back(current_pose.pose);
+            fraction = move_group_.computeCartesianPath(waypoints, eef_step, jump_threshold, trajectory);
+            move_group_.execute(trajectory);
+            double temp;
+            while(true)
+            {
                 current_pose = move_group_.getCurrentPose();
-                current_pose.pose.position.z = 0.25;
-                move_group_.setPoseTarget(current_pose, "panda_hand_tcp");
-                move_group_.move();
-                this->hand_action(logger_,0.18, 0.04, 30, 0.02, 0.02);
-//            }
-//            else
-//            {
-//                RCLCPP_INFO(logger_, "Cannot reach target pose!");
-//            }
+                temp = std::abs(current_pose.pose.position.x - 0.0628)+
+                       std::abs(current_pose.pose.position.y - 0.4156)+
+                       std::abs(current_pose.pose.position.z - 0.25);
+//                RCLCPP_INFO(logger_, "Temp error: %.2f", temp);
+                if(temp<0.02)
+                    break;
+                rclcpp::sleep_for(std::chrono::milliseconds(1000/freq));
+            }
+            rclcpp::sleep_for(std::chrono::seconds(1));
+//            rclcpp::sleep_for(std::chrono::seconds(10));
+
+//            // PLace object into box
+//            move_group_.setJointValueTarget(place_pose);
+//            move_group_.asyncMove();
+//            rclcpp::sleep_for(std::chrono::seconds(4));
+//            current_pose = move_group_.getCurrentPose();
+//            waypoints.clear();
+//            waypoints.push_back(current_pose.pose);
+//            fraction = move_group_.computeCartesianPath(waypoints, eef_step, jump_threshold, trajectory);
+//            move_group_.asyncExecute(trajectory);
+//            rclcpp::sleep_for(std::chrono::seconds(2));
+            this->hand_action(logger_,0.18, 0.04, 30, 0.02, 0.02);
         }
 
         // All tasks are finished, move to home configuration
