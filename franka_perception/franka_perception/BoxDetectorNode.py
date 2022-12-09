@@ -9,6 +9,7 @@ from cv_bridge import CvBridge, CvBridgeError
 import open3d as o3d
 
 from franka_interface.srv import StackPick
+from franka_perception.o3d_utils import o3d_pcd2numpy, rgbd_image2pcd
 from franka_perception.base.ImageNodeBase import ImageNodeBase
 from franka_perception.yolov5.detector import YoloV5
 
@@ -68,14 +69,15 @@ class BoxDetectorNode(ImageNodeBase):
                 cv2.putText(img, str(i), l[4:], cv2.FONT_HERSHEY_SIMPLEX,
                             fontScale=1, color=(0, 0, 255), thickness=3)
 
-            # Segment box
+            # Segment the plane of box
             pcd_list = []
             for b in bbox:
-                pcd_list.extend(self.segment(b, img_rgb, img_depth))
+                pcd_list.extend(self.segment(img_rgb, img_depth, b))
+                # Clear area marked
                 img_rgb[b[1]:b[3], b[0]:b[2], :] = 0
                 img_depth[b[1]:b[3], b[0]:b[2]] = 0
 
-            pcd_list.append(self.o3d_pcd2numpy(self.rgbd_image2pcd(img_rgb, img_depth)))
+            pcd_list.append(self.o3d_pcd2numpy(rgbd_image2pcd(img_rgb, img_depth, self.intrinsic)))
             pcd = np.concatenate(pcd_list, axis=0)
             pcd_msg = self.np_pcd2ros_msg(pcd, "camera_depth_optical_frame")
 
@@ -141,16 +143,13 @@ class BoxDetectorNode(ImageNodeBase):
         pose.orientation.w = 0.0
         return pose
 
-    def segment(self, b, img_rgb, img_depth):
+    def segment(self, img_rgb, img_depth, bbox):
         result_rgb = np.zeros_like(img_rgb)
         result_depth = np.zeros_like(img_depth)
-        result_rgb[b[1]:b[3], b[0]:b[2], :] = img_rgb[b[1]:b[3], b[0]:b[2], :]
-        result_depth[b[1]:b[3], b[0]:b[2]] = img_depth[b[1]:b[3], b[0]:b[2]]
-        result_rgb_o3d = o3d.geometry.Image(result_rgb.astype(np.uint8))
-        result_depth_o3d = o3d.geometry.Image(result_depth.astype(np.uint16))
-        result_rgbd = o3d.geometry.RGBDImage.create_from_color_and_depth(
-            result_rgb_o3d, result_depth_o3d)
-        result_pcd = o3d.geometry.PointCloud.create_from_rgbd_image(result_rgbd, self.intrinsic)
+        result_rgb[bbox[1]:bbox[3], bbox[0]:bbox[2], :] = img_rgb[bbox[1]:bbox[3], bbox[0]:bbox[2], :]
+        result_depth[bbox[1]:bbox[3], bbox[0]:bbox[2]] = img_depth[bbox[1]:bbox[3], bbox[0]:bbox[2]]
+        # Generate point cloud from new RGB-D image
+        result_pcd = rgbd_image2pcd(result_rgb, result_depth, self.intrinsic)
 
         plane_model, inliers = result_pcd.segment_plane(distance_threshold=0.01,
                                                         ransac_n=3,
@@ -160,28 +159,7 @@ class BoxDetectorNode(ImageNodeBase):
         inlier_cloud.paint_uniform_color([1.0, 0, 0])
         outlier_cloud = result_pcd.select_by_index(inliers, invert=True)
 
-        return [self.o3d_pcd2numpy(inlier_cloud), self.o3d_pcd2numpy(outlier_cloud)]
-
-    """********************* Functions for convert ***************************"""
-    def rgbd_image2pcd(self, img_rgb, img_depth):
-        """
-        Convert color and depth image (numpy array format) to point cloud (open3D format)
-        """
-        color_raw = o3d.geometry.Image(img_rgb.astype(np.uint8))
-        depth_raw = o3d.geometry.Image(img_depth.astype(np.uint16))
-        rgbd_image = o3d.geometry.RGBDImage.create_from_color_and_depth(color_raw, depth_raw)
-        pcd = o3d.geometry.PointCloud.create_from_rgbd_image(rgbd_image, self.intrinsic)
-        return pcd
-
-    @staticmethod
-    def o3d_pcd2numpy(o3d_pcd: o3d.geometry.PointCloud()):
-        """
-            Convert point cloud (open3D format) to numpy array (xyzrgb for ROS PointCloud2 format)
-        """
-        points = np.asarray(o3d_pcd.points)
-        colors = np.asarray(o3d_pcd.colors)
-        np_array = np.concatenate([points, colors], axis=1)
-        return np_array
+        return [o3d_pcd2numpy(inlier_cloud), o3d_pcd2numpy(outlier_cloud)]
 
     def np_pcd2ros_msg(self, points, parent_frame):
         """ Creates a point cloud message.

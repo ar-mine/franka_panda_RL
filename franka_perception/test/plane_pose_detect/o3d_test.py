@@ -1,8 +1,9 @@
 import numpy as np
 import cv2 as cv
 import open3d as o3d
-import matplotlib.pyplot as plt
+from franka_perception.utils import from_two_vectors
 from franka_perception.yolov5.detector import YoloV5
+from franka_perception.o3d_utils import rgbd_image2pcd
 
 intrinsic = o3d.camera.PinholeCameraIntrinsic(
         640, 480, 616.0755615234375, 616.6409912109375, 335.7129211425781, 234.61709594726562)
@@ -35,11 +36,8 @@ for b in bbox:
     result_depth[b[1]:b[3], b[0]:b[2]] = img_depth[b[1]:b[3], b[0]:b[2]]
     img_rgb[b[1]:b[3], b[0]:b[2], :] = 0
     img_depth[b[1]:b[3], b[0]:b[2]] = 0
-    result_rgb_o3d = o3d.geometry.Image(result_rgb.astype(np.uint8))
-    result_depth_o3d = o3d.geometry.Image(result_depth)
-    result_rgbd = o3d.geometry.RGBDImage.create_from_color_and_depth(
-        result_rgb_o3d, result_depth_o3d)
-    result_pcd = o3d.geometry.PointCloud.create_from_rgbd_image(result_rgbd, intrinsic)
+
+    result_pcd = rgbd_image2pcd(result_rgb, result_depth, intrinsic)
 
     plane_model, inliers = result_pcd.segment_plane(distance_threshold=0.01,
                                                      ransac_n=3,
@@ -49,14 +47,19 @@ for b in bbox:
     inlier_cloud.paint_uniform_color([1.0, 0, 0])
     outlier_cloud = result_pcd.select_by_index(inliers, invert=True)
 
-    pcd_list.extend([inlier_cloud, outlier_cloud])
+    center_xy = [(b[0] + b[2]) // 2, (b[1] + b[3]) // 2]
+    u_v_1 = np.array([center_xy[0], center_xy[1], 1]).T
+    x_y_z = np.matmul(np.linalg.inv(K), u_v_1)
+    x_y_z[2] = -(plane_model[0]*x_y_z[0] + plane_model[1]*x_y_z[1] + plane_model[3])/plane_model[2]
+    p_init = np.array([0, 0, 1]).transpose()
+    p_goal = np.array([plane_model[0], plane_model[1], plane_model[2]]).transpose()
+    R = from_two_vectors(p_init, p_goal)
+    axis = o3d.geometry.TriangleMesh.create_coordinate_frame().translate(x_y_z).rotate(R)
+
+    pcd_list.extend([inlier_cloud, outlier_cloud, axis])
 """****************************************"""
 
-color_raw = o3d.geometry.Image(img_rgb.astype(np.uint8))
-depth_raw = o3d.geometry.Image(img_depth)
-rgbd_image = o3d.geometry.RGBDImage.create_from_color_and_depth(color_raw, depth_raw)
-pcd_raw = o3d.geometry.PointCloud.create_from_rgbd_image(rgbd_image, intrinsic)
-
+pcd_raw = rgbd_image2pcd(img_rgb, img_depth, intrinsic)
 
 pcd_list.append(pcd_raw)
 
