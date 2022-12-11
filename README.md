@@ -1,8 +1,7 @@
 # franka_panda_RL
 ## Description
-This is a repo for Continental-NTU A6 Project(Manipulator Part) based on the ROS2. So far, it provides two pipelines and some modules will be replaced by advanced module:
-+ The pipeline to combine physical robot arm and virtual reinforcement learning environment;
-+ A demo of human demonstration case study;
+ROS2 based interface to connect functional packages (yolo, libfranka, moveit) 
+with tasks (layout-repeat, Sim2Real, hand guidance...)
 
 ## Branch(Alpha)
 The branch will make the documents and codes more standard from four aspects:

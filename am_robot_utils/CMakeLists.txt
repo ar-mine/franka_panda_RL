@@ -35,9 +35,9 @@ add_subdirectory(src/moveit)
 #=========
 # install
 #=========
-install(DIRECTORY launch
-        DESTINATION share/${PROJECT_NAME}
-        )
+#install(DIRECTORY launch
+#        DESTINATION share/${PROJECT_NAME}
+#        )
 install(DIRECTORY include/
         DESTINATION include
         )

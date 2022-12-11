@@ -19,8 +19,7 @@ find_package(control_msgs REQUIRED)
 find_package(rviz_visual_tools REQUIRED)
 find_package(OpenCV 4 REQUIRED)
 find_package(cv_bridge REQUIRED)
-find_package(RapidJSON REQUIRED)
-find_package(franka_action_interface REQUIRED)
+find_package(franka_interface REQUIRED)
 find_package(am_robot_utils REQUIRED)
 
 set(FRANKA_DEPEND

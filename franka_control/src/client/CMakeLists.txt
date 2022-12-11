@@ -1,4 +1,4 @@
-find_package(franka_action_interface REQUIRED)
+find_package(franka_interface REQUIRED)
 find_package(rclcpp_action REQUIRED)
 
 add_library(franka_client_lib SHARED
@@ -6,7 +6,7 @@ add_library(franka_client_lib SHARED
         )
 
 ament_target_dependencies(franka_client_lib
-        franka_action_interface
+        franka_interface
         rclcpp_action
         )
 

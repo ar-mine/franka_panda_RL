@@ -19,8 +19,7 @@ find_package(control_msgs REQUIRED)
 find_package(rviz_visual_tools REQUIRED)
 find_package(OpenCV 4 REQUIRED)
 find_package(cv_bridge REQUIRED)
-find_package(RapidJSON REQUIRED)
-find_package(franka_action_interface REQUIRED)
+find_package(franka_interface REQUIRED)
 find_package(am_robot_utils REQUIRED)
 
 set(FRANKA_DEPEND
@@ -110,7 +109,7 @@ ament_target_dependencies(round_views
         ${THIS_PACKAGE_INCLUDE_DEPENDS}
         ${MOVEIT_DEPEND}
         ${CV_DEPEND}
-        franka_action_interface
+        franka_interface
         )
 target_link_libraries(round_views
         moveit_utils_lib franka_utils_lib)
@@ -124,7 +123,7 @@ ament_target_dependencies(follow_targets_node
         ${THIS_PACKAGE_INCLUDE_DEPENDS}
         ${MOVEIT_DEPEND}
         ${CV_DEPEND}
-        franka_action_interface
+        franka_interface
         )
 target_link_libraries(follow_targets_node
         moveit_utils_lib franka_utils_lib)
@@ -138,7 +137,7 @@ ament_target_dependencies(hand_process_node
         ${THIS_PACKAGE_INCLUDE_DEPENDS}
         ${MOVEIT_DEPEND}
         ${CV_DEPEND}
-        franka_action_interface
+        franka_interface
         )
 target_link_libraries(hand_process_node
         moveit_utils_lib franka_utils_lib)

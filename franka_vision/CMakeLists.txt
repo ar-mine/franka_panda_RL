@@ -49,9 +49,9 @@ ament_export_libraries(${PROJECT_NAME})
 #=========
 # install
 #=========
-install(DIRECTORY launch
-        DESTINATION share/${PROJECT_NAME}
-        )
+#install(DIRECTORY launch
+#        DESTINATION share/${PROJECT_NAME}
+#        )
 install(DIRECTORY include/
         DESTINATION include
         )
