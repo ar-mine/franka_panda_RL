@@ -43,16 +43,20 @@ set(THIS_PACKAGE_INCLUDE_DEPENDS
         tf2_geometry_msgs
         )
 
-add_executable(moveit_cpp_tutorial src/moveit_cpp_tutorial.cpp)
-target_include_directories(moveit_cpp_tutorial PUBLIC include)
-ament_target_dependencies(moveit_cpp_tutorial  ${THIS_PACKAGE_INCLUDE_DEPENDS})
-install(TARGETS moveit_cpp_tutorial
+add_executable(moveit_cpp_base src/moveit_cpp_base.cpp)
+target_include_directories(moveit_cpp_base PUBLIC include)
+ament_target_dependencies(moveit_cpp_base  ${THIS_PACKAGE_INCLUDE_DEPENDS})
+install(TARGETS moveit_cpp_base
         DESTINATION lib/${PROJECT_NAME}
         )
 
 install(
         DIRECTORY config launch rviz
         DESTINATION share/${PROJECT_NAME}
+)
+install(
+        DIRECTORY include/
+        DESTINATION include
 )
 if(BUILD_TESTING)
   find_package(ament_lint_auto REQUIRED)

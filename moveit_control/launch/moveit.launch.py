@@ -134,7 +134,7 @@ def generate_launch_description():
     moveit_cpp_node = Node(
         name="moveit_cpp_tutorial",
         package="moveit_control",
-        executable="moveit_cpp_tutorial",
+        executable="moveit_cpp_base",
         output="screen",
         parameters=[
             moveit_cpp_yaml_file_name,
