@@ -34,12 +34,12 @@ install(DIRECTORY launch configs
         DESTINATION share/${PROJECT_NAME}
         )
 
-add_subdirectory(src/client)
-add_subdirectory(src/moveit)
-add_subdirectory(src/utils)
-add_subdirectory(src/realtime)
-add_subdirectory(src/nerf_pipeline)
-add_subdirectory(src/layout_repeat)
+#add_subdirectory(src/client)
+#add_subdirectory(src/moveit)
+#add_subdirectory(src/utils)
+#add_subdirectory(src/realtime)
+#add_subdirectory(src/nerf_pipeline)
+#add_subdirectory(src/layout_repeat)
 #if(BUILD_TESTING)
 #  find_package(ament_lint_auto REQUIRED)
 #  ament_lint_auto_find_test_dependencies()
