@@ -7,20 +7,36 @@
 
 namespace am_franka_controllers{
 
-MoveitCppBase::MoveitCppBase(const std::string& node_name, const rclcpp::NodeOptions& node_options)
-                            : Node(node_name, node_options){
-    RCLCPP_INFO(this->get_logger(), "Initialize node");
-
+MoveitCppBase::MoveitCppBase(const rclcpp::Node::SharedPtr& node) : node_(node){
+    
     static const std::string PLANNING_GROUP = "panda_arm";
     static const std::string LOGNAME = "moveit_cpp_tutorial";
 
-    auto moveit_cpp_ptr = std::make_shared<moveit_cpp::MoveItCpp>(this);
+    auto moveit_cpp_ptr = std::make_shared<moveit_cpp::MoveItCpp>(node_);
     moveit_cpp_ptr->getPlanningSceneMonitor()->providePlanningSceneService();
 
-    auto planning_components = std::make_shared<moveit_cpp::PlanningComponent>(PLANNING_GROUP, moveit_cpp_ptr);
-    auto robot_model_ptr = moveit_cpp_ptr->getRobotModel();
-    auto robot_start_state = planning_components->getStartState();
-    auto joint_model_group_ptr = robot_model_ptr->getJointModelGroup(PLANNING_GROUP);
+    planning_components_ = std::make_shared<moveit_cpp::PlanningComponent>(PLANNING_GROUP, moveit_cpp_ptr);
+    robot_model_ptr_ = moveit_cpp_ptr->getRobotModel();
+    robot_start_state_ = planning_components_->getStartState();
+    joint_model_group_ptr_ = robot_model_ptr_->getJointModelGroup(PLANNING_GROUP);
+
+    RCLCPP_INFO(node->get_logger(), "Initialize MoveitCppBase");
+
+}
+
+bool MoveitCppBase::MoveFromCurrent(const geometry_msgs::msg::Pose& target_pose){
+    geometry_msgs::msg::PoseStamped target;
+    target.pose = target_pose;
+    target.header.frame_id = "panda_link0";
+    planning_components_->setGoal(target, "panda_link8");
+    auto plan_solution = planning_components_->plan();
+    if (plan_solution){
+        planning_components_->execute();
+        return true;
+    }
+    else{
+        return false;
+    }
 }
 
 }
@@ -33,13 +49,25 @@ int main(int argc, char** argv){
     // best practice would be to declare parameters in the corresponding classes
     // and provide descriptions about expected use
     node_options.automatically_declare_parameters_from_overrides(true);
-    auto moveit_cpp_node = std::make_shared<am_franka_controllers::MoveitCppBase>("run_moveit_cpp", node_options);
+    rclcpp::Node::SharedPtr node = rclcpp::Node::make_shared("moveit_cpp_base", "", node_options);
+    RCLCPP_INFO(node->get_logger(), "Initialize node");
 
     // We spin up a SingleThreadedExecutor for the current state monitor to get information
     // about the robot's state.
     rclcpp::executors::MultiThreadedExecutor executor;
-    executor.add_node(moveit_cpp_node);
-    executor.spin();
+    executor.add_node(node);
+    std::thread([&executor]() { executor.spin(); }).detach();
+
+    auto move_cpp_node = am_franka_controllers::MoveitCppBase(node);
+    geometry_msgs::msg::Pose target_pose;
+    target_pose.orientation.w = 1.0;
+    target_pose.position.x = 0.28;
+    target_pose.position.y = -0.2;
+    target_pose.position.z = 0.5;
+    move_cpp_node.MoveFromCurrent(target_pose);
+
+    RCLCPP_INFO(node->get_logger(), "Shutting down.");
+    rclcpp::shutdown();
 
     return 0;
 }

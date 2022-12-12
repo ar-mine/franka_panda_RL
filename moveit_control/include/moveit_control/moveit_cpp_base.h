@@ -13,9 +13,18 @@
 
 namespace am_franka_controllers{
 
-class MoveitCppBase : public rclcpp::Node {
+class MoveitCppBase {
 public:
-    explicit MoveitCppBase(const std::string& node_name, const rclcpp::NodeOptions& node_options);
+    explicit MoveitCppBase(const rclcpp::Node::SharedPtr& node);
+
+    bool MoveFromCurrent(const geometry_msgs::msg::Pose& target_pose);
+
+private:
+    const rclcpp::Node::SharedPtr& node_;
+    std::shared_ptr<moveit_cpp::PlanningComponent> planning_components_;
+    moveit::core::RobotModelConstPtr robot_model_ptr_;
+    moveit::core::RobotStatePtr robot_start_state_;
+    const moveit::core::JointModelGroup * joint_model_group_ptr_;
 };
 
 }
