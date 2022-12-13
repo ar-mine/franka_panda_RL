@@ -6,11 +6,11 @@
 #include "moveit_control/moveit_cpp_base.h"
 
 namespace am_franka_controllers{
+    volatile bool MoveitCppBase::keepRunning_ = true;
 
 MoveitCppBase::MoveitCppBase(const rclcpp::Node::SharedPtr& node) : node_(node){
     
     static const std::string PLANNING_GROUP = "panda_arm";
-    static const std::string LOGNAME = "moveit_cpp_tutorial";
 
     auto moveit_cpp_ptr = std::make_shared<moveit_cpp::MoveItCpp>(node_);
     moveit_cpp_ptr->getPlanningSceneMonitor()->providePlanningSceneService();
@@ -39,7 +39,20 @@ bool MoveitCppBase::MoveFromCurrent(const geometry_msgs::msg::Pose& target_pose)
     }
 }
 
+void MoveitCppBase::run(){
+    signal(SIGINT, MoveitCppBase::signalHandler);
+
+    while(MoveitCppBase::keepRunning_){
+        ;
+    }
 }
+
+void MoveitCppBase::signalHandler(int){
+    MoveitCppBase::keepRunning_ = false;
+}
+
+}
+
 
 int main(int argc, char** argv){
     rclcpp::init(argc, argv);
@@ -59,12 +72,14 @@ int main(int argc, char** argv){
     std::thread([&executor]() { executor.spin(); }).detach();
 
     auto move_cpp_node = am_franka_controllers::MoveitCppBase(node);
-    geometry_msgs::msg::Pose target_pose;
-    target_pose.orientation.w = 1.0;
-    target_pose.position.x = 0.28;
-    target_pose.position.y = -0.2;
-    target_pose.position.z = 0.5;
-    move_cpp_node.MoveFromCurrent(target_pose);
+//    geometry_msgs::msg::Pose target_pose;
+//    target_pose.orientation.w = 1.0;
+//    target_pose.position.x = 0.28;
+//    target_pose.position.y = -0.2;
+//    target_pose.position.z = 0.5;
+//    move_cpp_node.MoveFromCurrent(target_pose);
+    move_cpp_node.run();
+
 
     RCLCPP_INFO(node->get_logger(), "Shutting down.");
     rclcpp::shutdown();

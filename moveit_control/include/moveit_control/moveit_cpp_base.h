@@ -19,12 +19,19 @@ public:
 
     bool MoveFromCurrent(const geometry_msgs::msg::Pose& target_pose);
 
+    void run();
+
+    static volatile bool keepRunning_;
+
 private:
     const rclcpp::Node::SharedPtr& node_;
+
     std::shared_ptr<moveit_cpp::PlanningComponent> planning_components_;
     moveit::core::RobotModelConstPtr robot_model_ptr_;
     moveit::core::RobotStatePtr robot_start_state_;
     const moveit::core::JointModelGroup * joint_model_group_ptr_;
+
+    static void signalHandler(int);
 };
 
 }
