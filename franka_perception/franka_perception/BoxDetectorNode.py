@@ -11,7 +11,7 @@ import open3d as o3d
 from franka_interface.srv import StackPick
 from franka_perception.o3d_utils import o3d_pcd2numpy, rgbd_image2pcd
 from franka_perception.base.ImageNodeBase import ImageNodeBase
-from franka_perception.yolov5.detector import YoloV5
+from yolov5.detect_once import YoloDetector
 
 import time
 import cv2
@@ -32,7 +32,7 @@ class BoxDetectorNode(ImageNodeBase):
         self.bridge = CvBridge()
         self.image_publisher = self.create_publisher(Image, "/detector_out", 3)
 
-        self.detector = YoloV5()
+        self.detector = YoloDetector()
 
         self.timer = self.create_timer(1 / 10, self.timer_callback)
 

@@ -1,8 +1,8 @@
 import numpy as np
 import cv2 as cv
 import open3d as o3d
+from yolov5.detect_once import YoloDetector
 from franka_perception.utils import from_two_vectors
-from franka_perception.yolov5.detector import YoloV5
 from franka_perception.o3d_utils import rgbd_image2pcd
 
 intrinsic = o3d.camera.PinholeCameraIntrinsic(
@@ -11,7 +11,7 @@ intrinsic = o3d.camera.PinholeCameraIntrinsic(
 K = np.array([[616.0755615234375, 0.0, 335.7129211425781],
               [0.0, 616.6409912109375, 234.61709594726562],
               [0.0, 0.0, 1.0]])
-detector = YoloV5()
+detector = YoloDetector()
 
 img_rgb = cv.imread("01329_rgb.png")[..., ::-1]
 img_depth = cv.imread("01329_depth.png", cv.IMREAD_UNCHANGED)
