@@ -1,15 +1,13 @@
 import numpy as np
 import rclpy
 import copy
-from rclpy.action import ActionClient
-from std_msgs.msg import Header
-from sensor_msgs.msg import Image, PointCloud2, PointField
+from sensor_msgs.msg import Image, PointCloud2
 from geometry_msgs.msg import Pose
-from cv_bridge import CvBridge, CvBridgeError
+from cv_bridge import CvBridge
 import open3d as o3d
 
 from franka_interface.srv import StackPick
-from franka_perception.o3d_utils import o3d_pcd2numpy, rgbd_image2pcd
+from franka_perception.o3d_utils import o3d_pcd2numpy, rgbd_image2pcd, np_pcd2ros_msg
 from franka_perception.base.ImageNodeBase import ImageNodeBase
 from yolov5.detect_once import YoloDetector
 
@@ -39,6 +37,7 @@ class BoxDetectorNode(ImageNodeBase):
         self.bbox = []
         self.stack_pick_srv = self.create_service(StackPick, 'stack_pick', self.stack_pick_callback)
 
+        self.target_idx = 0
         self.intrinsic = o3d.camera.PinholeCameraIntrinsic(
             640, 480, 616.0755615234375, 616.6409912109375, 335.7129211425781, 234.61709594726562)
         self.pcd_publisher = self.create_publisher(PointCloud2, "/pcd", 1)
@@ -47,49 +46,53 @@ class BoxDetectorNode(ImageNodeBase):
 
     def timer_callback(self):
         if self.rgb_img is not None and self.depth_img is not None:
-            img_rgb = copy.copy(self.rgb_img)
-            img_depth = copy.copy(self.depth_img)
+            img_rgb = copy.deepcopy(self.rgb_img)
+            img_depth = copy.deepcopy(self.depth_img)
 
+            """>>>>>>>>>>>> RGB image processing <<<<<<<<<<<<"""
             # Annotate bounding boxes
             img, det = self.detector.inference(copy.copy(img_rgb))
             det = det.cpu().numpy().astype(int)
-            # Get main result
-            bbox = []
+            # Retain detected results with 'box' class
+            xyxy_center = []
             for *xyxy, conf, cls in reversed(det):
                 if cls != 0:
                     continue
                 center_xy = [(xyxy[0] + xyxy[2]) // 2, (xyxy[1] + xyxy[3]) // 2]
 
-                temp = xyxy
-                temp.extend(center_xy)
-                bbox.append(temp)
-            # Label each box
-            self.bbox = sorted(bbox, reverse=True, key=lambda element: element[1])
+                xyxy_center.append([*xyxy, *center_xy])
+            # Label each box (rule: left-bottom point, from large to small)
+            self.bbox = sorted(xyxy_center, reverse=True, key=lambda element: element[1])
             for i, l in enumerate(self.bbox):
                 cv2.putText(img, str(i), l[4:], cv2.FONT_HERSHEY_SIMPLEX,
                             fontScale=1, color=(0, 0, 255), thickness=3)
+            cv2.putText(img, 'FPS:%.2f' % (1 / (time.time() - self.last_time)), (0, 30), cv2.FONT_HERSHEY_SIMPLEX,
+                        fontScale=1, color=(0, 0, 255), thickness=1)
+            # Update time recorded
+            self.last_time = time.time()
+            img_msg = self.bridge.cv2_to_imgmsg(img, "bgr8")
+            """>>>>>>>>>>>> RGB image processing <<<<<<<<<<<<"""
 
+            """>>>>>>>>>>>> Point Cloud processing <<<<<<<<<<<<"""
             # Segment the plane of box
-            pcd_list = []
-            for b in bbox:
-                pcd_list.extend(self.segment(img_rgb, img_depth, b))
-                # Clear area marked
+            if len(self.bbox) > self.target_idx:
+                b = self.bbox[self.target_idx]
+                pcd_list = [self.segment(img_rgb, img_depth, b)]
+                # Remove area marked
                 img_rgb[b[1]:b[3], b[0]:b[2], :] = 0
                 img_depth[b[1]:b[3], b[0]:b[2]] = 0
 
-            pcd_list.append(self.o3d_pcd2numpy(rgbd_image2pcd(img_rgb, img_depth, self.intrinsic)))
-            pcd = np.concatenate(pcd_list, axis=0)
-            pcd_msg = self.np_pcd2ros_msg(pcd, "camera_depth_optical_frame")
+                pcd_list.append(o3d_pcd2numpy(rgbd_image2pcd(img_rgb, img_depth, self.intrinsic)))
+                pcd = np.concatenate(pcd_list, axis=0)
+                pcd_msg = np_pcd2ros_msg(pcd, "camera_depth_optical_frame", self.get_clock().now().to_msg())
+            else:
+                pcd_msg = None
+            """>>>>>>>>>>>> Point Cloud processing <<<<<<<<<<<<"""
 
-            cv2.putText(img, 'FPS:%.2f' % (1 / (time.time() - self.last_time)), (0, 30), cv2.FONT_HERSHEY_SIMPLEX,
-                        fontScale=1, color=(0, 0, 255), thickness=1)
-            img_msg = self.bridge.cv2_to_imgmsg(img, "bgr8")
             # Publish annotated images and segmented point cloud
             self.image_publisher.publish(img_msg)
-            self.pcd_publisher.publish(pcd_msg)
-
-            # Update time recorded
-            self.last_time = time.time()
+            if pcd_msg is not None:
+                self.pcd_publisher.publish(pcd_msg)
 
     def stack_pick_callback(self, request, response):
         idx = request.idx
@@ -160,37 +163,6 @@ class BoxDetectorNode(ImageNodeBase):
         outlier_cloud = result_pcd.select_by_index(inliers, invert=True)
 
         return [o3d_pcd2numpy(inlier_cloud), o3d_pcd2numpy(outlier_cloud)]
-
-    def np_pcd2ros_msg(self, points, parent_frame):
-        """ Creates a point cloud message.
-        Args:
-            points: Nx6 array of xyz positions (m) and rgb colors (0..1)
-            parent_frame: frame in which the point cloud is defined
-        Returns:
-            sensor_msgs/PointCloud2 message
-        """
-
-        item_size = np.dtype(np.float32).itemsize
-
-        data = points.astype(np.float32).tobytes()
-
-        fields = [PointField(
-            name=n, offset=i * item_size, datatype=PointField.FLOAT32, count=1)
-            for i, n in enumerate('xyzrgb')]
-
-        header = Header(frame_id=parent_frame, stamp=self.get_clock().now().to_msg())
-
-        return PointCloud2(
-            header=header,
-            height=1,
-            width=points.shape[0],
-            is_dense=False,
-            is_bigendian=False,
-            fields=fields,
-            point_step=(item_size * 6),
-            row_step=(item_size * 6 * points.shape[0]),
-            data=data
-        )
 
 
 def collision_check(xyxy_a, xyxy_b):
