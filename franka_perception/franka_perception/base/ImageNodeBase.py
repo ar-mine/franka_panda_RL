@@ -53,11 +53,12 @@ class ImageNodeBase(Node):
         self.logger = self.get_logger()
         self.bridge = CvBridge()
 
-        # Camera parameters
+        # Camera info
         self.cameraInfo_subscription = self.create_subscription(CameraInfo, "/camera/color/camera_info",
                                                                 self.camera_info_callback, 3)
         self.camera_k = None
         self.camera_d = None
+        self.width_height = [0, 0]
 
     def rgb_callback(self, rgb_msg):
         try:
@@ -81,6 +82,7 @@ class ImageNodeBase(Node):
         if self.camera_k is None or self.camera_d is None:
             self.camera_k = np.array(camera_info_msg.k).reshape((3, 3))
             self.camera_d = np.array(camera_info_msg.d)
+            self.width_height = [camera_info_msg.width, camera_info_msg.height]
 
 
 def main(args=None):

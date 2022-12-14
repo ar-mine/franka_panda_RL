@@ -1,4 +1,5 @@
 import numpy as np
+from scipy.spatial.transform import Rotation as R
 
 
 def skew(x):
@@ -11,8 +12,12 @@ def from_two_vectors(p_init, p_goal):
     v = np.cross(p_init, p_goal)
     s = np.linalg.norm(v)
     c = np.dot(p_init, p_goal)
-    R = np.eye(3) + skew(v)*s + np.matmul(skew(v), skew(v))*(1 - c)
+    R = np.eye(3) + skew(v) * s + np.matmul(skew(v), skew(v)) * (1 - c)
     return R
+
+
+def matrix2quat(m):
+    return R.from_matrix(m).as_quat()
 
 
 if __name__ == "__main__":

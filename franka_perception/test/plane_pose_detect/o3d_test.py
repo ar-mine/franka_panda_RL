@@ -11,7 +11,7 @@ intrinsic = o3d.camera.PinholeCameraIntrinsic(
 K = np.array([[616.0755615234375, 0.0, 335.7129211425781],
               [0.0, 616.6409912109375, 234.61709594726562],
               [0.0, 0.0, 1.0]])
-detector = YoloDetector()
+detector = YoloDetector('box_detection')
 
 img_rgb = cv.imread("01329_rgb.png")[..., ::-1]
 img_depth = cv.imread("01329_depth.png", cv.IMREAD_UNCHANGED)

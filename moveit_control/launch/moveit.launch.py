@@ -116,20 +116,6 @@ def generate_launch_description():
                                      '/MoveItSimpleControllerManager',
     }
 
-    trajectory_execution = {
-        'moveit_manage_controllers': True,
-        'trajectory_execution.allowed_execution_duration_scaling': 1.2,
-        'trajectory_execution.allowed_goal_duration_margin': 0.5,
-        'trajectory_execution.allowed_start_tolerance': 0.01,
-    }
-
-    planning_scene_monitor_parameters = {
-        'publish_planning_scene': True,
-        'publish_geometry_updates': True,
-        'publish_state_updates': True,
-        'publish_transforms_updates': True,
-    }
-
     # MoveItCpp demo executable
     moveit_cpp_node = Node(
         name="moveit_cpp_tutorial",
@@ -169,6 +155,15 @@ def generate_launch_description():
         name="static_transform_publisher",
         output="log",
         arguments=["0.0", "0.0", "0.0", "0.0", "0.0", "0.0", "world", "panda_link0"],
+    )
+
+    camera_tf = Node(
+        package="tf2_ros",
+        executable="static_transform_publisher",
+        name="static_transform_publisher",
+        output="log",
+        arguments=["0.274459", "0.00285477", "0.0384874", "-0.4329768", "0.4177108", "-0.5698107", "0.5597898",
+                   "panda_link0", "camera_color_optical_frame"],
     )
 
     # Publish TF
@@ -224,6 +219,7 @@ def generate_launch_description():
          moveit_cpp_node,
          rviz_node,
          static_tf,
+         camera_tf,
          robot_state_publisher,
          ros2_control_node,
          joint_state_publisher,

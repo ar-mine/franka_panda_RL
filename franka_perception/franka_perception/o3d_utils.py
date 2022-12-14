@@ -23,35 +23,3 @@ def rgbd_image2pcd(img_rgb, img_depth, intrinsic):
     rgbd_image = o3d.geometry.RGBDImage.create_from_color_and_depth(color_raw, depth_raw)
     pcd = o3d.geometry.PointCloud.create_from_rgbd_image(rgbd_image, intrinsic)
     return pcd
-
-
-def np_pcd2ros_msg(points, parent_frame, time):
-    """ Creates a point cloud message.
-    Args:
-        points: Nx6 array of xyz positions (m) and rgb colors (0..1)
-        parent_frame: frame in which the point cloud is defined
-    Returns:
-        sensor_msgs/PointCloud2 message
-    """
-
-    item_size = np.dtype(np.float32).itemsize
-
-    data = points.astype(np.float32).tobytes()
-
-    fields = [PointField(
-        name=n, offset=i * item_size, datatype=PointField.FLOAT32, count=1)
-        for i, n in enumerate('xyzrgb')]
-
-    header = Header(frame_id=parent_frame, stamp=time)
-
-    return PointCloud2(
-        header=header,
-        height=1,
-        width=points.shape[0],
-        is_dense=False,
-        is_bigendian=False,
-        fields=fields,
-        point_step=(item_size * 6),
-        row_step=(item_size * 6 * points.shape[0]),
-        data=data
-    )
