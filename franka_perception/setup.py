@@ -21,7 +21,8 @@ setup(
     entry_points={
         'console_scripts': [
             'instance_detector = franka_perception.ObjDetectorNode:main',
-            'box_detector = franka_perception.BoxDetectorNode:main'
+            'box_detector = franka_perception.BoxDetectorNode:main',
+            'move_box = franka_perception.MoveBoxNode:main'
         ],
     },
 )
