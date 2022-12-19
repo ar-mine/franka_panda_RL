@@ -1,8 +1,9 @@
 import numpy as np
-import rclpy
 import copy
 import time
 
+import rclpy
+from rclpy.callback_groups import ReentrantCallbackGroup
 from sensor_msgs.msg import Image, PointCloud2
 from geometry_msgs.msg import Pose
 from cv_bridge import CvBridge
@@ -14,8 +15,9 @@ import cv2
 from franka_interface.srv import StackPick
 from franka_perception.utils import from_two_vectors, matrix2quat
 from franka_perception.o3d_utils import o3d_pcd2numpy, rgbd_image2pcd
-from franka_perception.ros_utils import np2tf_msg, np_pcd2ros_msg
+from franka_perception.ros_utils import np2tf_msg, np_pcd2ros_msg, np2pose
 from franka_perception.base.ImageNodeBase import ImageNodeBase
+
 from yolov5.detect_once import YoloDetector
 
 
@@ -29,26 +31,43 @@ T_base2camera = np.array([[0.0016669, 0.2762302, 0.9610900, 0.274459],
 class BoxDetectorNode(ImageNodeBase):
     def __init__(self, **kwargs):
         super().__init__(**kwargs)
+        # Init member variable (get images implemented in base class)
         self.rgb_img = None
         self.depth_img = None
-
+        # Init publisher for annotated images with bbox
         self.bridge = CvBridge()
-        self.image_publisher = self.create_publisher(Image, "/detector_out", 3)
-
+        self.image_publisher = self.create_publisher(Image, "~/bbox", 3)
+        # Init detector based on yolo-v5 for box detection
         self.detector = YoloDetector('box_detection')
 
-        self.timer = self.create_timer(1 / 10, self.timer_callback)
+        # Use ReentrantCallbackGroup() because service callback need a trigger
+        self.callback_group = ReentrantCallbackGroup()
 
+        # The main processing loop
+        self.loop_timer = self.create_timer(1 / 10, self.timer_callback)
+        # The clock for thread sleep
+        self.sleep_clock = self.create_rate(10)
+
+        # TODO: remove this class-level bbox but just publish it
         self.bbox = []
-        self.stack_pick_srv = self.create_service(StackPick, 'stack_pick', self.stack_pick_callback)
 
-        self.target_idx = 0
+        # The service to change to compute the pose of box with target index and return its pose
+        self.pose_calc_srv = self.create_service(StackPick, '~/pose_calc',
+                                                 self.pose_calc_callback, callback_group=self.callback_group)
+        # The variable to be set in mainloop
+        self.target_pose = Pose()
+        # A trigger to guarantee we can get target pose after calling service
+        self.new_frame = False
+
+        # Compute the pose of box with target idx
+        self.target_idx = -1
         self.intrinsic = o3d.camera.PinholeCameraIntrinsic()
-        self.pcd_publisher = self.create_publisher(PointCloud2, "/pcd", 1)
+        self.pcd_publisher = self.create_publisher(PointCloud2, "~/pcd", 1)
 
         # Initialize the transform broadcaster
         self.tf_broadcaster = TransformBroadcaster(self)
 
+        # For fps calculation
         self.last_time = time.time()
 
     def camera_info_callback(self, camera_info_msg):
@@ -94,52 +113,61 @@ class BoxDetectorNode(ImageNodeBase):
             """>>>>>>>>>>>> RGB image processing <<<<<<<<<<<<"""
 
             """>>>>>>>>>>>> Point Cloud processing <<<<<<<<<<<<"""
+            pcd_list = []
             # Segment the plane of box
-            if len(self.bbox) > self.target_idx:
+            if len(self.bbox) > self.target_idx >= 0:
                 b = self.bbox[self.target_idx]
                 pcd_list = self.segment(img_rgb, img_depth, b)
                 # Remove area marked
                 img_rgb[b[1]:b[3], b[0]:b[2], :] = 0
                 img_depth[b[1]:b[3], b[0]:b[2]] = 0
 
-                pcd_list.append(o3d_pcd2numpy(rgbd_image2pcd(img_rgb, img_depth, self.intrinsic)))
-                pcd = np.concatenate(pcd_list, axis=0)
-                pcd_msg = np_pcd2ros_msg(pcd, self.get_clock().now().to_msg(), "camera_color_optical_frame")
-            else:
-                pcd_msg = None
+            pcd_list.append(o3d_pcd2numpy(rgbd_image2pcd(img_rgb, img_depth, self.intrinsic)))
+            pcd = np.concatenate(pcd_list, axis=0)
+            pcd_msg = np_pcd2ros_msg(pcd, self.get_clock().now().to_msg(), "camera_color_optical_frame")
+
             """>>>>>>>>>>>> Point Cloud processing <<<<<<<<<<<<"""
 
             # Publish annotated images and segmented point cloud
             self.image_publisher.publish(img_msg)
-            if pcd_msg is not None:
-                self.pcd_publisher.publish(pcd_msg)
+            self.pcd_publisher.publish(pcd_msg)
 
-    def stack_pick_callback(self, request, response):
+    # def stack_pick_callback(self, request, response):
+    #     idx = request.idx
+    #     bbox = self.bbox
+    #     len_bbox = len(bbox)
+    #     if idx >= len_bbox:
+    #         response.last_one = -1
+    #         response.target_pose = Pose()
+    #         self.get_logger().info("Wrong idx number!")
+    #
+    #     # Generate graph array
+    #     d_graph = np.zeros([len_bbox, len_bbox])
+    #     for i in range(len_bbox):
+    #         for j in range(i + 1, len_bbox):
+    #             ret = collision_check(bbox[i], bbox[j])
+    #             if ret == 1:
+    #                 d_graph[i, j] = 1
+    #             elif ret == 2:
+    #                 d_graph[j, i] = 1
+    #     print(d_graph)
+    #
+    #     response.last_one = 1
+    #     while not np.sum(d_graph[:, idx]) == 0:
+    #         response.last_one = 0
+    #         idx = np.where(d_graph[:, idx] == 1)[0][0]
+    #
+    #     response.target_pose = self.camera2world(bbox[idx])
+    #     return response
+
+    def pose_calc_callback(self, request, response):
         idx = request.idx
-        bbox = self.bbox
-        len_bbox = len(bbox)
-        if idx >= len_bbox:
-            response.last_one = -1
-            response.target_pose = Pose()
-            self.get_logger().info("Wrong idx number!")
+        self.target_idx = idx
 
-        # Generate graph array
-        d_graph = np.zeros([len_bbox, len_bbox])
-        for i in range(len_bbox):
-            for j in range(i + 1, len_bbox):
-                ret = collision_check(bbox[i], bbox[j])
-                if ret == 1:
-                    d_graph[i, j] = 1
-                elif ret == 2:
-                    d_graph[j, i] = 1
-        print(d_graph)
-
-        response.last_one = 1
-        while not np.sum(d_graph[:, idx]) == 0:
-            response.last_one = 0
-            idx = np.where(d_graph[:, idx] == 1)[0][0]
-
-        response.target_pose = self.camera2world(bbox[idx])
+        self.new_frame = True
+        while self.new_frame:
+            self.sleep_clock.sleep()
+        response.target_pose = self.target_pose
         return response
 
     def camera2world(self, xyxy):
@@ -191,8 +219,12 @@ class BoxDetectorNode(ImageNodeBase):
         x_y_z[2] = -(plane_model[0] * x_y_z[0] + plane_model[1] * x_y_z[1] + plane_model[3]) / plane_model[2]
         p_init = np.array([0, 0, 1]).transpose()
         p_goal = np.array([plane_model[0], plane_model[1], plane_model[2]]).transpose()
-        R_quat = matrix2quat(from_two_vectors(p_init, p_goal))
-        self.tf_broadcaster.sendTransform(np2tf_msg([*x_y_z, *R_quat], self.get_clock().now().to_msg(),
+        rotation_quat = matrix2quat(from_two_vectors(p_init, p_goal))
+
+        if self.new_frame:
+            self.target_pose = np2pose([*x_y_z, *rotation_quat])
+            self.new_frame = False
+        self.tf_broadcaster.sendTransform(np2tf_msg([*x_y_z, *rotation_quat], self.get_clock().now().to_msg(),
                                                     'camera_color_optical_frame', 'box_pose'))
 
         return [plane_pd, o3d_pcd2numpy(outlier_cloud)]
@@ -225,7 +257,9 @@ def main(args=None):
 
     box_detector_node = BoxDetectorNode(node_name="box_detector", rgb_enable=True, depth_enable=True)
 
-    rclpy.spin(box_detector_node)
+    executor = rclpy.executors.MultiThreadedExecutor()
+    executor.add_node(box_detector_node)
+    executor.spin()
 
     box_detector_node.destroy_node()
     rclpy.shutdown()

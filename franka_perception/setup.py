@@ -5,7 +5,7 @@ package_name = 'franka_perception'
 setup(
     name=package_name,
     version='0.0.0',
-    packages=[package_name],
+    packages=[package_name, package_name+".base"],
     data_files=[
         # ('share/ament_index/resource_index/packages',
         #     ['resource/' + package_name]),
