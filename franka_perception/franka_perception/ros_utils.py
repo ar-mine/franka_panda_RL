@@ -1,7 +1,7 @@
 import numpy as np
 
-from std_msgs.msg import Header
-from geometry_msgs.msg import TransformStamped
+from std_msgs.msg import Header, Float32MultiArray, MultiArrayLayout, MultiArrayDimension
+from geometry_msgs.msg import TransformStamped, Pose
 from sensor_msgs.msg import PointCloud2, PointField
 
 
@@ -27,6 +27,21 @@ def np2tf_msg(xyz_xyzw, time, frame_parent, frame_child):
     t.transform.rotation.y = xyz_xyzw[4]
     t.transform.rotation.z = xyz_xyzw[5]
     t.transform.rotation.w = xyz_xyzw[6]
+
+    return t
+
+
+def np2pose(xyz_xyzw):
+    t = Pose()
+
+    t.position.x = xyz_xyzw[0]
+    t.position.y = xyz_xyzw[1]
+    t.position.z = xyz_xyzw[2]
+
+    t.orientation.x = xyz_xyzw[3]
+    t.orientation.y = xyz_xyzw[4]
+    t.orientation.z = xyz_xyzw[5]
+    t.orientation.w = xyz_xyzw[6]
 
     return t
 
@@ -61,3 +76,25 @@ def np_pcd2ros_msg(points, time, parent_frame):
         row_step=(item_size * 6 * points.shape[0]),
         data=data
     )
+
+
+def np2multi_array(np_array: np.ndarray) -> Float32MultiArray:
+    shape = np_array.shape
+    dim = len(shape)
+    stride = 1
+
+    layout_msg = MultiArrayLayout()
+    for i in reversed(range(dim)):
+        dim_msg = MultiArrayDimension()
+        stride *= shape[i]
+        dim_msg.stride = stride
+        dim_msg.size = shape[i]
+        dim_msg.label = str(i)
+        layout_msg.dim.append(dim_msg)
+    layout_msg.dim.reverse()
+
+    float_array = Float32MultiArray()
+    float_array.data = np_array.astype(float).flatten().tolist()
+    float_array.layout = layout_msg
+
+    return float_array

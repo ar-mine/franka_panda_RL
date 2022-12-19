@@ -4,6 +4,7 @@ import time
 
 import rclpy
 from rclpy.callback_groups import ReentrantCallbackGroup
+from std_msgs.msg import Float32MultiArray
 from sensor_msgs.msg import Image, PointCloud2
 from geometry_msgs.msg import Pose
 from cv_bridge import CvBridge
@@ -15,7 +16,7 @@ import cv2
 from franka_interface.srv import StackPick
 from franka_perception.utils import from_two_vectors, matrix2quat
 from franka_perception.o3d_utils import o3d_pcd2numpy, rgbd_image2pcd
-from franka_perception.ros_utils import np2tf_msg, np_pcd2ros_msg, np2pose
+from franka_perception.ros_utils import np2tf_msg, np_pcd2ros_msg, np2pose, np2multi_array
 from franka_perception.base.ImageNodeBase import ImageNodeBase
 
 from yolov5.detect_once import YoloDetector
@@ -36,7 +37,7 @@ class BoxDetectorNode(ImageNodeBase):
         self.depth_img = None
         # Init publisher for annotated images with bbox
         self.bridge = CvBridge()
-        self.image_publisher = self.create_publisher(Image, "~/bbox", 3)
+        self.image_publisher = self.create_publisher(Image, "~/bbox_image", 3)
         # Init detector based on yolo-v5 for box detection
         self.detector = YoloDetector('box_detection')
 
@@ -48,8 +49,8 @@ class BoxDetectorNode(ImageNodeBase):
         # The clock for thread sleep
         self.sleep_clock = self.create_rate(10)
 
-        # TODO: remove this class-level bbox but just publish it
-        self.bbox = []
+        # Init publisher for bbox array
+        self.bbox_publisher = self.create_publisher(Float32MultiArray, "~/bbox", 3)
 
         # The service to change to compute the pose of box with target index and return its pose
         self.pose_calc_srv = self.create_service(StackPick, '~/pose_calc',
@@ -71,6 +72,11 @@ class BoxDetectorNode(ImageNodeBase):
         self.last_time = time.time()
 
     def camera_info_callback(self, camera_info_msg):
+        """
+        @overwrite -> ImageNodeBase
+        :param camera_info_msg:
+        :return:
+        """
         if self.camera_k is None or self.camera_d is None:
             self.camera_k = np.array(camera_info_msg.k).reshape((3, 3))
             self.camera_d = np.array(camera_info_msg.d)
@@ -101,8 +107,8 @@ class BoxDetectorNode(ImageNodeBase):
 
                 xyxy_center.append([*xyxy, *center_xy])
             # Label each box (rule: left-bottom point, from large to small)
-            self.bbox = sorted(xyxy_center, reverse=True, key=lambda element: element[1])
-            for i, l in enumerate(self.bbox):
+            bbox = sorted(xyxy_center, reverse=True, key=lambda element: element[1])
+            for i, l in enumerate(bbox):
                 cv2.putText(img, str(i), l[4:], cv2.FONT_HERSHEY_SIMPLEX,
                             fontScale=1, color=(0, 0, 255), thickness=3)
             cv2.putText(img, 'FPS:%.2f' % (1 / (time.time() - self.last_time)), (0, 30), cv2.FONT_HERSHEY_SIMPLEX,
@@ -115,8 +121,8 @@ class BoxDetectorNode(ImageNodeBase):
             """>>>>>>>>>>>> Point Cloud processing <<<<<<<<<<<<"""
             pcd_list = []
             # Segment the plane of box
-            if len(self.bbox) > self.target_idx >= 0:
-                b = self.bbox[self.target_idx]
+            if len(bbox) > self.target_idx >= 0:
+                b = bbox[self.target_idx]
                 pcd_list = self.segment(img_rgb, img_depth, b)
                 # Remove area marked
                 img_rgb[b[1]:b[3], b[0]:b[2], :] = 0
@@ -129,36 +135,9 @@ class BoxDetectorNode(ImageNodeBase):
             """>>>>>>>>>>>> Point Cloud processing <<<<<<<<<<<<"""
 
             # Publish annotated images and segmented point cloud
+            self.bbox_publisher.publish(np2multi_array(np.array(bbox)))
             self.image_publisher.publish(img_msg)
             self.pcd_publisher.publish(pcd_msg)
-
-    # def stack_pick_callback(self, request, response):
-    #     idx = request.idx
-    #     bbox = self.bbox
-    #     len_bbox = len(bbox)
-    #     if idx >= len_bbox:
-    #         response.last_one = -1
-    #         response.target_pose = Pose()
-    #         self.get_logger().info("Wrong idx number!")
-    #
-    #     # Generate graph array
-    #     d_graph = np.zeros([len_bbox, len_bbox])
-    #     for i in range(len_bbox):
-    #         for j in range(i + 1, len_bbox):
-    #             ret = collision_check(bbox[i], bbox[j])
-    #             if ret == 1:
-    #                 d_graph[i, j] = 1
-    #             elif ret == 2:
-    #                 d_graph[j, i] = 1
-    #     print(d_graph)
-    #
-    #     response.last_one = 1
-    #     while not np.sum(d_graph[:, idx]) == 0:
-    #         response.last_one = 0
-    #         idx = np.where(d_graph[:, idx] == 1)[0][0]
-    #
-    #     response.target_pose = self.camera2world(bbox[idx])
-    #     return response
 
     def pose_calc_callback(self, request, response):
         idx = request.idx
@@ -228,28 +207,6 @@ class BoxDetectorNode(ImageNodeBase):
                                                     'camera_color_optical_frame', 'box_pose'))
 
         return [plane_pd, o3d_pcd2numpy(outlier_cloud)]
-
-
-def collision_check(xyxy_a, xyxy_b):
-    # Check intersection
-    ret = 0
-    minx = max(xyxy_a[0], xyxy_b[0])
-    miny = max(xyxy_a[1], xyxy_b[1])
-    maxx = min(xyxy_a[2], xyxy_b[2])
-    maxy = min(xyxy_a[3], xyxy_b[3])
-    if not (minx > maxx + 2 or miny > maxy + 2):
-        ret = 1
-
-    if ret:
-        if xyxy_a[3] < xyxy_b[3]:
-            ret = 1
-        elif xyxy_a[3] > xyxy_b[3]:
-            ret = 2
-        elif xyxy_a[3] == xyxy_b[3]:
-            ret = 3
-        else:
-            ret = -1
-    return ret
 
 
 def main(args=None):
