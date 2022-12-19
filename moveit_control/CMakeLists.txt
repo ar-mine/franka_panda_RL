@@ -25,6 +25,9 @@ find_package(pluginlib REQUIRED)
 find_package(tf2_ros REQUIRED)
 find_package(tf2_eigen REQUIRED)
 find_package(tf2_geometry_msgs REQUIRED)
+find_package(Franka REQUIRED)
+find_package(franka_msgs REQUIRED)
+find_package(franka_interface REQUIRED)
 
 set(THIS_PACKAGE_INCLUDE_DEPENDS
         Eigen3
@@ -45,7 +48,7 @@ set(THIS_PACKAGE_INCLUDE_DEPENDS
 
 add_executable(moveit_cpp_base src/moveit_cpp_base.cpp)
 target_include_directories(moveit_cpp_base PUBLIC include)
-ament_target_dependencies(moveit_cpp_base  ${THIS_PACKAGE_INCLUDE_DEPENDS})
+ament_target_dependencies(moveit_cpp_base  ${THIS_PACKAGE_INCLUDE_DEPENDS} Franka franka_msgs franka_interface)
 install(TARGETS moveit_cpp_base
         DESTINATION lib/${PROJECT_NAME}
         )

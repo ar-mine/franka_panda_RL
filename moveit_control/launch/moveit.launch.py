@@ -118,7 +118,7 @@ def generate_launch_description():
 
     # MoveItCpp demo executable
     moveit_cpp_node = Node(
-        name="moveit_cpp_tutorial",
+        name="moveit_cpp_node",
         package="moveit_control",
         executable="moveit_cpp_base",
         output="screen",

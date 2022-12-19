@@ -1,4 +1,4 @@
-moveit_cpp_tutorial:
+moveit_cpp_node:
   ros__parameters:
     planning_scene_monitor_options:
       name: "planning_scene_monitor"
