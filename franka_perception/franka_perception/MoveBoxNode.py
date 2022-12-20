@@ -2,16 +2,20 @@ import threading
 import time
 import copy
 
-import geometry_msgs.msg
 import rclpy
+import std_msgs.msg
 from rclpy.action import ActionClient
+from rclpy.callback_groups import ReentrantCallbackGroup
 from rclpy.node import Node
 
 from geometry_msgs.msg import Pose
-from std_msgs.msg import Bool
+from tf2_ros import TransformException
+from tf2_ros.buffer import Buffer
+from tf2_ros.transform_listener import TransformListener
 
 from franka_interface.action import CartPoseSet
 from franka_interface.srv import StackPick
+from franka_perception.ros_utils import tf_msg2pose
 
 
 # def stack_pick_callback(self, request, response):
@@ -67,9 +71,12 @@ def collision_check(xyxy_a, xyxy_b):
 class MoveBoxNode(Node):
     def __init__(self):
         super().__init__('move_box_node')
+        self.callback_group = ReentrantCallbackGroup()
+        self.gripper_publisher = self.create_publisher(std_msgs.msg.Bool, "/moveit_cpp_node/gripper", qos_profile=3)
+
         self._action_client = ActionClient(self, CartPoseSet, "/moveit_cpp_node/move")
-        self._target_subscription = self.create_subscription(Pose, "/target",
-                                                             callback=self.target_callback, qos_profile=3)
+        self._target_subscription = self.create_subscription(Pose, "/target", callback=self.target_callback,
+                                                             qos_profile=3, callback_group=self.callback_group)
         self._send_goal_future = None
         self._get_result_future = None
         self.finish = True
@@ -81,6 +88,8 @@ class MoveBoxNode(Node):
         self.pose_calc_client = self.create_client(StackPick, '/box_detector/pose_calc')
         while not self.pose_calc_client.wait_for_service(timeout_sec=1.0):
             self.get_logger().info('Service not available, waiting again...')
+
+        time.sleep(1)
 
     def send_goal_sync(self, cart_pose):
         goal_msg = CartPoseSet.Goal()
@@ -125,7 +134,6 @@ class MoveBoxNode(Node):
         req = StackPick.Request()
         req.idx = idx
         result = self.pose_calc_client.call(req)
-        self.get_logger().info("Get target pose successfully!")
         return result
 
 
@@ -142,9 +150,23 @@ def main(args=None):
     # Wait to make system stable
     time.sleep(1)
 
-    pose = move_box_node.get_target_pose(2).target_pose
-    pose.position.z -= 0.1
-    move_box_node.send_goal_sync(pose)
+    # pose = geometry_msgs.msg.Pose()
+    # pose.position.x = 0.2
+    # pose.position.y = -0.5
+    # pose.position.z = 0.5
+    # pose.orientation.x = 1.0
+    # pose.orientation.y = 0.0
+    # pose.orientation.z = 0.0
+    # pose.orientation.w = 0.0
+    msg = std_msgs.msg.Bool()
+    msg.data = True
+    pose = move_box_node.get_target_pose(1).target_pose
+    if pose is not None:
+        print(pose)
+        pose.position.x -= 0.1
+        move_box_node.send_goal_sync(pose)
+        move_box_node.gripper_publisher.publish(msg)
+
     # idx_list = [0, 0, 0]
     # pose_calibration = [[0.0, -0.03], [0.02, 0.05], [0.05, 0.0]]
     #

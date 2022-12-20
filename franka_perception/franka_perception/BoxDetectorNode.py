@@ -9,12 +9,15 @@ from sensor_msgs.msg import Image, PointCloud2
 from geometry_msgs.msg import Pose
 from cv_bridge import CvBridge
 from tf2_ros import TransformBroadcaster
+from tf2_ros import TransformException
+from tf2_ros.buffer import Buffer
+from tf2_ros.transform_listener import TransformListener
 
 import open3d as o3d
 import cv2
 
 from franka_interface.srv import StackPick
-from franka_perception.utils import from_two_vectors, matrix2quat
+from franka_perception.utils import from_two_vectors, matrix2quat, pose_multiply
 from franka_perception.o3d_utils import o3d_pcd2numpy, rgbd_image2pcd
 from franka_perception.ros_utils import np2tf_msg, np_pcd2ros_msg, np2pose, np2multi_array
 from franka_perception.base.ImageNodeBase import ImageNodeBase
@@ -23,10 +26,7 @@ from yolov5.detect_once import YoloDetector
 
 
 # 0.274459 0.00285477 0.0384874   -0.432977 0.417711 -0.569811 0.55979
-T_base2camera = np.array([[0.0016669, 0.2762302, 0.9610900, 0.274459],
-                          [-0.9996665, -0.0243063, 0.0087197, 0.00285477],
-                          [0.0257692, -0.9607841, 0.2760976, 0.0384874],
-                          [0, 0, 0, 1]])
+T_base2camera = np.array([-0.404592, -0.56721, 0.245231, 0.519546, -0.481973, 0.512896, -0.484471])
 
 
 class BoxDetectorNode(ImageNodeBase):
@@ -56,7 +56,7 @@ class BoxDetectorNode(ImageNodeBase):
         self.pose_calc_srv = self.create_service(StackPick, '~/pose_calc',
                                                  self.pose_calc_callback, callback_group=self.callback_group)
         # The variable to be set in mainloop
-        self.target_pose = Pose()
+        self.target_relative_pose = []
         # A trigger to guarantee we can get target pose after calling service
         self.new_frame = False
 
@@ -66,6 +66,8 @@ class BoxDetectorNode(ImageNodeBase):
         self.pcd_publisher = self.create_publisher(PointCloud2, "~/pcd", 1)
 
         # Initialize the transform broadcaster
+        self.tf_buffer = Buffer()
+        self.tf_listener = TransformListener(self.tf_buffer, self)
         self.tf_broadcaster = TransformBroadcaster(self)
 
         # For fps calculation
@@ -143,10 +145,23 @@ class BoxDetectorNode(ImageNodeBase):
         idx = request.idx
         self.target_idx = idx
 
+        # Try to get the transform camera2base_link
+        # to_frame_rel = "panda_link0"
+        # from_frame_rel = "camera_color_optical_frame"
+        # try:
+        #     t = self.tf_buffer.lookup_transform(
+        #         to_frame_rel,
+        #         from_frame_rel,
+        #         rclpy.time.Time())
+        # except TransformException as ex:
+        #     t = Pose()
+        #     self.get_logger().info(f'Could not transform {to_frame_rel} to {from_frame_rel}: {ex}')
+
         self.new_frame = True
         while self.new_frame:
             self.sleep_clock.sleep()
-        response.target_pose = self.target_pose
+
+        response.target_pose = np2pose(pose_multiply(T_base2camera, self.target_relative_pose))
         return response
 
     def camera2world(self, xyxy):
@@ -201,7 +216,7 @@ class BoxDetectorNode(ImageNodeBase):
         rotation_quat = matrix2quat(from_two_vectors(p_init, p_goal))
 
         if self.new_frame:
-            self.target_pose = np2pose([*x_y_z, *rotation_quat])
+            self.target_relative_pose = [*x_y_z, *rotation_quat]
             self.new_frame = False
         self.tf_broadcaster.sendTransform(np2tf_msg([*x_y_z, *rotation_quat], self.get_clock().now().to_msg(),
                                                     'camera_color_optical_frame', 'box_pose'))

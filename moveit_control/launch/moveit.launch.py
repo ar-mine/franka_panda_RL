@@ -160,9 +160,9 @@ def generate_launch_description():
     camera_tf = Node(
         package="tf2_ros",
         executable="static_transform_publisher",
-        name="static_transform_publisher",
+        name="static_transform_publisher2",
         output="log",
-        arguments=["0.274459", "0.00285477", "0.0384874", "-0.4329768", "0.4177108", "-0.5698107", "0.5597898",
+        arguments=["-0.404592", "-0.56721", "0.245231", "0.519546", "-0.481973", "0.512896", "-0.484471",
                    "panda_link0", "camera_color_optical_frame"],
     )
 

@@ -32,7 +32,7 @@ class ReachActionServer(Node):
         goal_handle.succeed()
 
         # print(np.array(goal_handle.request.target_pose))
-        self.sever.set_goal(np.array(goal_handle.request.target_pose))
+        self.sever.set_goal(np.array(goal_handle.request.target_relative_pose))
 
         waypoints = next(self.motion_sever)
         waypoints = waypoints.flatten().tolist()

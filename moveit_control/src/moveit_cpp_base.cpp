@@ -3,6 +3,7 @@
 //
 
 #include <rclcpp/executors/multi_threaded_executor.hpp>
+#include <franka/exception.h>
 #include "moveit_control/moveit_cpp_base.h"
 #include "std_msgs/msg/bool.hpp"
 #include "franka_interface/srv/stack_pick.hpp"
@@ -64,6 +65,17 @@ MoveitCppBase::MoveitCppBase(const rclcpp::Node::SharedPtr& node) : node_(node){
 
     // Gripper loop
     vacuum_gripper_ = std::make_unique<franka::VacuumGripper>("172.16.0.2");
+    gripper_sub_ = node_->create_subscription<std_msgs::msg::Bool>("~/gripper", rclcpp::QoS(1),
+                                                                   [this](const std_msgs::msg::Bool::ConstSharedPtr msg){
+       if(msg->data)
+       {
+           gripper_status = 1;
+       }
+       else
+       {
+           gripper_status = 0;
+       }
+    });
 
     // TF
     tf_buffer_ = std::make_unique<tf2_ros::Buffer>(node_->get_clock());
@@ -90,37 +102,32 @@ bool MoveitCppBase::move_from_current(const geometry_msgs::msg::Pose& target_pos
 
 void MoveitCppBase::run(){
     signal(SIGINT, MoveitCppBase::signalHandler);
-//    rclcpp::sleep_for(std::chrono::seconds(5));
-//
-//    rclcpp::Client<franka_interface::srv::StackPick>::SharedPtr client =
-//            node_->create_client<franka_interface::srv::StackPick>("stack_pick");
-//    auto request = std::make_shared<franka_interface::srv::StackPick::Request>();
-//    request->idx = 2;
-//    auto result = client->async_send_request(request);
-//    if (rclcpp::spin_until_future_complete(node_, result) ==
-//        rclcpp::FutureReturnCode::SUCCESS)
-//    {
-//        RCLCPP_INFO(rclcpp::get_logger("rclcpp"), "Switch successfully");
-//    } else {
-//        RCLCPP_ERROR(rclcpp::get_logger("rclcpp"), "Failed to call service add_two_ints");
-//    }
-//    rclcpp::sleep_for(std::chrono::seconds(1));
-//    geometry_msgs::msg::TransformStamped t;
-//    try {
-//         t = tf_buffer_->lookupTransform(
-//                "camera_color_optical_frame", "box_pose",
-//                tf2::TimePointZero);
-//    } catch (const tf2::TransformException & ex) {
-//        RCLCPP_INFO(
-//                node_->get_logger(), "Could not transform %s to %s: %s",
-//                "camera_color_optical_frame", "box_pose", ex.what());
-//        return;
-//    }
-//    RCLCPP_INFO(node_->get_logger(), "Pose: %.4f, %.4f, %.4f || %.4f, %.4f, %.4f, %.4f",
-//                t.transform.translation.x, t.transform.translation.y, t.transform.translation.z,
-//                t.transform.rotation.x, t.transform.rotation.y, t.transform.rotation.z, t.transform.rotation.w);
+    gripper_status = -1;
+
     while(MoveitCppBase::keepRunning_){
-        ;
+        if(gripper_status >= 0){
+            try
+            {
+                if(gripper_status)
+                {
+                    vacuum_gripper_->vacuum(50, std::chrono::milliseconds(1000));
+                    RCLCPP_INFO(node_->get_logger(), "Try to suck object");
+                }
+                else
+                {
+                    vacuum_gripper_->dropOff(std::chrono::milliseconds(1000));
+                    RCLCPP_INFO(node_->get_logger(), "Try to drop out object");
+                }
+            }
+            catch (franka::Exception const& e)
+            {
+                vacuum_gripper_->stop();
+                RCLCPP_FATAL_STREAM(node_->get_logger(), e.what());
+            }
+            gripper_status = -1;
+        }
+
+        rclcpp::sleep_for(std::chrono::milliseconds(100));
     }
 }
 

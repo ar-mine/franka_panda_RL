@@ -13,6 +13,7 @@
 #include <moveit/moveit_cpp/planning_component.h>
 
 #include <franka/vacuum_gripper.h>
+#include <std_msgs/msg/bool.hpp>
 
 #include "franka_interface/action/cart_pose_set.hpp"
 
@@ -41,14 +42,11 @@ private:
     rclcpp_action::Server<CartPoseSet>::SharedPtr move_server_;
 
     std::unique_ptr<franka::VacuumGripper> vacuum_gripper_;
+    rclcpp::Subscription<std_msgs::msg::Bool>::SharedPtr gripper_sub_;
+    int gripper_status;
 
     std::unique_ptr<tf2_ros::Buffer> tf_buffer_;
     std::shared_ptr<tf2_ros::TransformListener> tf_listener_;
-
-//    rclcpp_action::GoalResponse move_goal(const rclcpp_action::GoalUUID & uuid, const std::shared_ptr<const CartPoseSet::Goal>& goal);
-//    rclcpp_action::CancelResponse move_cancel(const std::shared_ptr<GoalHandleCartPoseSet>& goal_handle);
-//    void move_accepted(const std::shared_ptr<GoalHandleCartPoseSet>& goal_handle);
-//    void move_execute(const std::shared_ptr<GoalHandleCartPoseSet>& goal_handle);
 
     static void signalHandler(int);
 };

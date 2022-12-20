@@ -1,3 +1,4 @@
+from typing import Union
 import numpy as np
 
 from std_msgs.msg import Header, Float32MultiArray, MultiArrayLayout, MultiArrayDimension
@@ -98,3 +99,28 @@ def np2multi_array(np_array: np.ndarray) -> Float32MultiArray:
     float_array.layout = layout_msg
 
     return float_array
+
+
+def tf_msg2pose(tf_msg: TransformStamped) -> Pose:
+    pose = Pose()
+    pose.position.x = tf_msg.transform.translation.x
+    pose.position.y = tf_msg.transform.translation.y
+    pose.position.z = tf_msg.transform.translation.z
+    pose.orientation.x = tf_msg.transform.rotation.x
+    pose.orientation.y = tf_msg.transform.rotation.y
+    pose.orientation.z = tf_msg.transform.rotation.z
+    pose.orientation.w = tf_msg.transform.rotation.w
+    return pose
+
+
+def pose2numpy(pose: Union[Pose, TransformStamped, np.ndarray]) -> np.ndarray:
+    if type(pose) is not np.ndarray:
+        if type(pose) is Pose:
+            pose = np.array([pose.position.x, pose.position.y, pose.position.z,
+                             pose.orientation.x, pose.orientation.y, pose.orientation.z, pose.orientation.w])
+        elif type(pose) is TransformStamped:
+            pose = np.array([pose.transform.translation.x, pose.transform.translation.y, pose.transform.translation.z,
+                             pose.transform.rotation.x, pose.transform.rotation.y, pose.transform.rotation.z, pose.transform.rotation.w])
+        return pose
+    else:
+        return pose
