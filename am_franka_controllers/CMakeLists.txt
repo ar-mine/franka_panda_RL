@@ -31,6 +31,7 @@ add_library(
         ${PROJECT_NAME}
         SHARED
         src/controller_base.cpp
+        src/vacuum_pump.cpp
         src/cartesian_impedance_controller.cpp
         src/cartesian_position_controller.cpp
 )

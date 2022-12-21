@@ -1,3 +1,0 @@
-int64 idx
----
-geometry_msgs/Pose target_pose

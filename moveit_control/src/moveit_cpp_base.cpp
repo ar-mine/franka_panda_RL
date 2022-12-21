@@ -64,17 +64,26 @@ MoveitCppBase::MoveitCppBase(const rclcpp::Node::SharedPtr& node) : node_(node){
     );
 
     // Gripper loop
-    vacuum_gripper_ = std::make_unique<franka::VacuumGripper>("172.16.0.2");
-    gripper_sub_ = node_->create_subscription<std_msgs::msg::Bool>("~/gripper", rclcpp::QoS(1),
-                                                                   [this](const std_msgs::msg::Bool::ConstSharedPtr msg){
-       if(msg->data)
-       {
-           gripper_status = 1;
-       }
-       else
-       {
-           gripper_status = 0;
-       }
+    pump_ = std::make_unique<VacuumPump>(node_);
+    pump_->connect("172.16.0.2");
+    pump_server_ = node_->create_service<franka_interface::srv::VacuumCommand>("~/pump", [this]
+    (const std::shared_ptr<franka_interface::srv::VacuumCommand::Request> request,
+     std::shared_ptr<franka_interface::srv::VacuumCommand::Response> response){
+        int command = request->command;
+        bool ret = true;
+        if (command == 1){
+            RCLCPP_INFO(node_->get_logger(), "Try to suck object");
+            pump_->vacuum(50, std::chrono::seconds(1));
+            rclcpp::sleep_for(std::chrono::seconds(1));
+            ret = pump_->success();
+            if (ret) pump_->stop();
+        }
+        else{
+            RCLCPP_INFO(node_->get_logger(), "Try to drop out object");
+            pump_->dropOff(std::chrono::seconds(1));
+        }
+        response->success = ret;
+        return response;
     });
 
     // TF
@@ -83,6 +92,11 @@ MoveitCppBase::MoveitCppBase(const rclcpp::Node::SharedPtr& node) : node_(node){
 
     RCLCPP_INFO(node->get_logger(), "Initialize MoveitCppBase");
 
+}
+
+MoveitCppBase::~MoveitCppBase() {
+    pump_->stop();
+    pump_->disconnect();
 }
 
 bool MoveitCppBase::move_from_current(const geometry_msgs::msg::Pose& target_pose){
@@ -102,31 +116,8 @@ bool MoveitCppBase::move_from_current(const geometry_msgs::msg::Pose& target_pos
 
 void MoveitCppBase::run(){
     signal(SIGINT, MoveitCppBase::signalHandler);
-    gripper_status = -1;
 
     while(MoveitCppBase::keepRunning_){
-        if(gripper_status >= 0){
-            try
-            {
-                if(gripper_status)
-                {
-                    vacuum_gripper_->vacuum(50, std::chrono::milliseconds(1000));
-                    RCLCPP_INFO(node_->get_logger(), "Try to suck object");
-                }
-                else
-                {
-                    vacuum_gripper_->dropOff(std::chrono::milliseconds(1000));
-                    RCLCPP_INFO(node_->get_logger(), "Try to drop out object");
-                }
-            }
-            catch (franka::Exception const& e)
-            {
-                vacuum_gripper_->stop();
-                RCLCPP_FATAL_STREAM(node_->get_logger(), e.what());
-            }
-            gripper_status = -1;
-        }
-
         rclcpp::sleep_for(std::chrono::milliseconds(100));
     }
 }
@@ -155,8 +146,8 @@ int main(int argc, char** argv){
     executor.add_node(node);
     std::thread([&executor]() { executor.spin(); }).detach();
 
-    auto move_cpp_node = am_franka_controllers::MoveitCppBase(node);
-    move_cpp_node.run();
+    auto move_cpp_node = std::make_shared<am_franka_controllers::MoveitCppBase>(node);
+    move_cpp_node->run();
 
     RCLCPP_INFO(node->get_logger(), "Shutting down.");
     rclcpp::shutdown();

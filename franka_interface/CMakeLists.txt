@@ -17,7 +17,8 @@ find_package(geometry_msgs REQUIRED)
 
 rosidl_generate_interfaces(${PROJECT_NAME}
         "action/CartPoseSet.action"
-        "srv/StackPick.srv"
+        "srv/GetIdxPose.srv"
+        "srv/VacuumCommand.srv"
         DEPENDENCIES geometry_msgs)
 
 if(BUILD_TESTING)

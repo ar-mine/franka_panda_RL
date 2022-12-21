@@ -9,13 +9,10 @@ from rclpy.callback_groups import ReentrantCallbackGroup
 from rclpy.node import Node
 
 from geometry_msgs.msg import Pose
-from tf2_ros import TransformException
-from tf2_ros.buffer import Buffer
-from tf2_ros.transform_listener import TransformListener
 
 from franka_interface.action import CartPoseSet
-from franka_interface.srv import StackPick
-from franka_perception.ros_utils import tf_msg2pose
+from franka_interface.srv import StackPick, VacuumCommand
+from franka_perception.ros_utils import np2pose
 
 
 # def stack_pick_callback(self, request, response):
@@ -72,9 +69,8 @@ class MoveBoxNode(Node):
     def __init__(self):
         super().__init__('move_box_node')
         self.callback_group = ReentrantCallbackGroup()
-        self.gripper_publisher = self.create_publisher(std_msgs.msg.Bool, "/moveit_cpp_node/gripper", qos_profile=3)
 
-        self._action_client = ActionClient(self, CartPoseSet, "/moveit_cpp_node/move")
+        self._action_client = ActionClient(self, CartPoseSet, "/moveit_cpp_node/move", callback_group=self.callback_group)
         self._target_subscription = self.create_subscription(Pose, "/target", callback=self.target_callback,
                                                              qos_profile=3, callback_group=self.callback_group)
         self._send_goal_future = None
@@ -82,14 +78,17 @@ class MoveBoxNode(Node):
         self.finish = True
 
         self.pose = Pose()
-        self.rate = self.create_rate(0.1)
+        self.rate = self.create_rate(10)
 
         # Init service client for pose of target box
-        self.pose_calc_client = self.create_client(StackPick, '/box_detector/pose_calc')
-        while not self.pose_calc_client.wait_for_service(timeout_sec=1.0):
-            self.get_logger().info('Service not available, waiting again...')
-
-        time.sleep(1)
+        self._vacuum_client = self.create_client(VacuumCommand, '/moveit_cpp_node/pump')
+        if not self._vacuum_client.wait_for_service(timeout_sec=2.0):
+            self.get_logger().info('Service not available')
+            rclpy.shutdown()
+        self._pose_calc_client = self.create_client(StackPick, '/box_detector/pose_calc')
+        if not self._pose_calc_client.wait_for_service(timeout_sec=2.0):
+            self.get_logger().info('Service not available')
+            rclpy.shutdown()
 
     def send_goal_sync(self, cart_pose):
         goal_msg = CartPoseSet.Goal()
@@ -112,7 +111,7 @@ class MoveBoxNode(Node):
             self.finish = True
             return
 
-        self.get_logger().info('Goal accepted :)')
+        self.get_logger().info('Goal accepted.')
 
         self._get_result_future = goal_handle.get_result_async()
         self._get_result_future.add_done_callback(self.get_result_callback)
@@ -131,10 +130,16 @@ class MoveBoxNode(Node):
         :param idx: the box to be picked
         :return:
         """
-        req = StackPick.Request()
-        req.idx = idx
-        result = self.pose_calc_client.call(req)
+        request = StackPick.Request()
+        request.idx = idx
+        result = self._pose_calc_client.call(request)
         return result
+
+    def vacuum_command(self, command):
+        request = VacuumCommand.Request()
+        request.command = command
+        result = self._vacuum_client.call(request)
+        return result.success
 
 
 def main(args=None):
@@ -150,24 +155,30 @@ def main(args=None):
     # Wait to make system stable
     time.sleep(1)
 
-    # pose = geometry_msgs.msg.Pose()
-    # pose.position.x = 0.2
-    # pose.position.y = -0.5
-    # pose.position.z = 0.5
-    # pose.orientation.x = 1.0
-    # pose.orientation.y = 0.0
-    # pose.orientation.z = 0.0
-    # pose.orientation.w = 0.0
+    pose_init = np2pose([0.0, -0.5, 0.5, 1.0, 0.0, 0.0, 0.0])
+    move_box_node.send_goal_sync(pose_init)
+
     msg = std_msgs.msg.Bool()
     msg.data = True
     pose = move_box_node.get_target_pose(1).target_pose
     if pose is not None:
         print(pose)
-        pose.position.x -= 0.1
+        pose.position.x -= 0.2
         move_box_node.send_goal_sync(pose)
-        move_box_node.gripper_publisher.publish(msg)
+        pose.position.x += 0.1
+        move_box_node.send_goal_sync(pose)
+        move_box_node.vacuum_command(1)
+        time.sleep(2)
+        pose.position.z += 0.2
+        move_box_node.send_goal_sync(pose)
+        move_box_node.send_goal_sync(pose_init)
 
-    # idx_list = [0, 0, 0]
+        pose_init.position.z = 0.22
+        move_box_node.send_goal_sync(pose_init)
+        msg.data = False
+        move_box_node.vacuum_command(0)
+
+# idx_list = [0, 0, 0]
     # pose_calibration = [[0.0, -0.03], [0.02, 0.05], [0.05, 0.0]]
     #
     # for i, j in zip(idx_list, pose_calibration):

@@ -32,6 +32,8 @@ namespace am_franka_controllers{
 
         explicit VacuumPump(const rclcpp::Node::SharedPtr& node);
 
+        ~VacuumPump();
+
         /** Connect the pump device to an actual pump, the pump operations are then done in a background thread*/
         bool connect(const std::string & ip);
 

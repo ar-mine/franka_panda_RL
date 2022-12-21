@@ -16,7 +16,7 @@ from tf2_ros.transform_listener import TransformListener
 import open3d as o3d
 import cv2
 
-from franka_interface.srv import StackPick
+from franka_interface.srv import GetIdxPose
 from franka_perception.utils import from_two_vectors, matrix2quat, pose_multiply
 from franka_perception.o3d_utils import o3d_pcd2numpy, rgbd_image2pcd
 from franka_perception.ros_utils import np2tf_msg, np_pcd2ros_msg, np2pose, np2multi_array
@@ -51,9 +51,10 @@ class BoxDetectorNode(ImageNodeBase):
 
         # Init publisher for bbox array
         self.bbox_publisher = self.create_publisher(Float32MultiArray, "~/bbox", 3)
+        self.bbox_len = 0
 
         # The service to change to compute the pose of box with target index and return its pose
-        self.pose_calc_srv = self.create_service(StackPick, '~/pose_calc',
+        self.pose_calc_srv = self.create_service(GetIdxPose, '~/pose_calc',
                                                  self.pose_calc_callback, callback_group=self.callback_group)
         # The variable to be set in mainloop
         self.target_relative_pose = []
@@ -115,6 +116,7 @@ class BoxDetectorNode(ImageNodeBase):
                             fontScale=1, color=(0, 0, 255), thickness=3)
             cv2.putText(img, 'FPS:%.2f' % (1 / (time.time() - self.last_time)), (0, 30), cv2.FONT_HERSHEY_SIMPLEX,
                         fontScale=1, color=(0, 0, 255), thickness=1)
+            self.bbox_len = len(bbox)
             # Update time recorded
             self.last_time = time.time()
             img_msg = self.bridge.cv2_to_imgmsg(img, "bgr8")
@@ -123,7 +125,7 @@ class BoxDetectorNode(ImageNodeBase):
             """>>>>>>>>>>>> Point Cloud processing <<<<<<<<<<<<"""
             pcd_list = []
             # Segment the plane of box
-            if len(bbox) > self.target_idx >= 0:
+            if self.bbox_len > self.target_idx >= 0:
                 b = bbox[self.target_idx]
                 pcd_list = self.segment(img_rgb, img_depth, b)
                 # Remove area marked
@@ -143,6 +145,12 @@ class BoxDetectorNode(ImageNodeBase):
 
     def pose_calc_callback(self, request, response):
         idx = request.idx
+        if idx > self.bbox_len:
+            response.success = False
+            self.get_logger().info("The input idx is invalid!")
+            return response
+        else:
+            response.success = True
         self.target_idx = idx
 
         # Try to get the transform camera2base_link
@@ -164,29 +172,29 @@ class BoxDetectorNode(ImageNodeBase):
         response.target_pose = np2pose(pose_multiply(T_base2camera, self.target_relative_pose))
         return response
 
-    def camera2world(self, xyxy):
-        center_xy = [(xyxy[0] + xyxy[2]) // 2, (xyxy[1] + xyxy[3]) // 2]
-        top_xy = [(xyxy[0] + xyxy[2]) // 2, xyxy[1]]
-        depth = np.sum(self.depth_img[center_xy[1] - 2:center_xy[1] + 3, center_xy[0] - 2:center_xy[0] + 3]) / 25 / 1000
-
-        u_v_1 = np.array([top_xy[0], top_xy[1], 1]).T
-        x_y_z = np.matmul(np.linalg.inv(self.camera_k), u_v_1) * (depth + 0.01)
-
-        T_camera2target = np.eye(4)
-        T_camera2target[:3, 3] = x_y_z
-        T_camera2target = np.matmul(T_base2camera, T_camera2target)[:3, 3]
-        T_camera2target[0] += 0.05
-
-        pose = Pose()
-        pose.position.x = T_camera2target[0]
-        pose.position.y = T_camera2target[1]
-        pose.position.z = T_camera2target[2]
-
-        pose.orientation.x = 1.0
-        pose.orientation.y = 0.0
-        pose.orientation.z = 0.0
-        pose.orientation.w = 0.0
-        return pose
+    # def camera2world(self, xyxy):
+    #     center_xy = [(xyxy[0] + xyxy[2]) // 2, (xyxy[1] + xyxy[3]) // 2]
+    #     top_xy = [(xyxy[0] + xyxy[2]) // 2, xyxy[1]]
+    #     depth = np.sum(self.depth_img[center_xy[1] - 2:center_xy[1] + 3, center_xy[0] - 2:center_xy[0] + 3]) / 25 / 1000
+    #
+    #     u_v_1 = np.array([top_xy[0], top_xy[1], 1]).T
+    #     x_y_z = np.matmul(np.linalg.inv(self.camera_k), u_v_1) * (depth + 0.01)
+    #
+    #     T_camera2target = np.eye(4)
+    #     T_camera2target[:3, 3] = x_y_z
+    #     T_camera2target = np.matmul(T_base2camera, T_camera2target)[:3, 3]
+    #     T_camera2target[0] += 0.05
+    #
+    #     pose = Pose()
+    #     pose.position.x = T_camera2target[0]
+    #     pose.position.y = T_camera2target[1]
+    #     pose.position.z = T_camera2target[2]
+    #
+    #     pose.orientation.x = 1.0
+    #     pose.orientation.y = 0.0
+    #     pose.orientation.z = 0.0
+    #     pose.orientation.w = 0.0
+    #     return pose
 
     def segment(self, img_rgb, img_depth, bbox):
         result_rgb = np.zeros_like(img_rgb)

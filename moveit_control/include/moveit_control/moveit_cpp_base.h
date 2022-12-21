@@ -8,13 +8,13 @@
 #include <rclcpp/logger.hpp>
 #include <rclcpp/node.hpp>
 #include "rclcpp_action/rclcpp_action.hpp"
+#include <std_msgs/msg/bool.hpp>
 
 #include <moveit/moveit_cpp/moveit_cpp.h>
 #include <moveit/moveit_cpp/planning_component.h>
 
-#include <franka/vacuum_gripper.h>
-#include <std_msgs/msg/bool.hpp>
-
+#include "am_franka_controllers/vacuum_pump.h"
+#include "franka_interface/srv/vacuum_command.hpp"
 #include "franka_interface/action/cart_pose_set.hpp"
 
 namespace am_franka_controllers{
@@ -24,6 +24,8 @@ class MoveitCppBase {
     using GoalHandleCartPoseSet = rclcpp_action::ServerGoalHandle<CartPoseSet>;
 public:
     explicit MoveitCppBase(const rclcpp::Node::SharedPtr& node);
+
+    ~MoveitCppBase();
 
     bool move_from_current(const geometry_msgs::msg::Pose& target_pose);
 
@@ -41,9 +43,8 @@ private:
 
     rclcpp_action::Server<CartPoseSet>::SharedPtr move_server_;
 
-    std::unique_ptr<franka::VacuumGripper> vacuum_gripper_;
-    rclcpp::Subscription<std_msgs::msg::Bool>::SharedPtr gripper_sub_;
-    int gripper_status;
+    std::unique_ptr<VacuumPump> pump_;
+    rclcpp::Service<franka_interface::srv::VacuumCommand>::SharedPtr pump_server_;
 
     std::unique_ptr<tf2_ros::Buffer> tf_buffer_;
     std::shared_ptr<tf2_ros::TransformListener> tf_listener_;

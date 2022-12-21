@@ -1,0 +1,4 @@
+# vacuum (1) or dropOff (0)
+int32 command
+---
+bool success
